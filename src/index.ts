@@ -22,7 +22,8 @@ app.use(helmet());
 // CORS configuration
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000' || 'https://cleartax-frontend.vercel.app',
+
     credentials: true,
   })
 );
