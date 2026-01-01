@@ -107,5 +107,8 @@ if (process.env.VERCEL !== '1') {
 }
 
 // Export app for Vercel serverless functions
+// Vercel with @vercel/node expects module.exports
+// Also export as default for TypeScript compatibility
 export default app;
+module.exports = app;
 
