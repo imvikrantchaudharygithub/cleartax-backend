@@ -51,6 +51,9 @@ export const uploadDocument = multer({
 // Single image upload
 export const singleImageUpload = uploadImage.single('image');
 
+// Single image upload with 'file' field name (for team routes)
+export const singleFileUpload = uploadImage.single('file');
+
 // Single document upload
 export const singleDocumentUpload = uploadDocument.single('document');
 
