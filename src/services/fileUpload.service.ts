@@ -55,6 +55,10 @@ export const uploadComplianceDocument = async (file: Express.Multer.File): Promi
   return uploadToCloudinary(file, CLOUDINARY_FOLDERS.COMPLIANCE_DOCS);
 };
 
+export const uploadTestimonialImage = async (file: Express.Multer.File): Promise<UploadResult> => {
+  return uploadToCloudinary(file, CLOUDINARY_FOLDERS.TESTIMONIALS);
+};
+
 export const deleteFromCloudinary = async (publicId: string): Promise<void> => {
   try {
     await cloudinary.uploader.destroy(publicId);

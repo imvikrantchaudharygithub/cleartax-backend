@@ -57,3 +57,9 @@ export const singleFileUpload = uploadImage.single('file');
 // Single document upload
 export const singleDocumentUpload = uploadDocument.single('document');
 
+// Testimonial image upload (supports two file fields: companyLogo and personAvatar)
+export const testimonialImageUpload = uploadImage.fields([
+  { name: 'companyLogo', maxCount: 1 },
+  { name: 'personAvatar', maxCount: 1 },
+]);
+
