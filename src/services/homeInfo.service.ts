@@ -1,14 +1,9 @@
-import { HomeInfo, IHomeInfo } from '../models/HomeInfo.model';
+import { HomeInfo } from '../models/HomeInfo.model';
 import { uploadToCloudinary, deleteFromCloudinary } from './fileUpload.service';
 import { CLOUDINARY_FOLDERS } from '../config/constants';
 
-export const getHomeInfo = async () => {
-  const homeInfo = await HomeInfo.findOne();
-  if (!homeInfo) {
-    throw new Error('Home info not found');
-  }
-  return homeInfo;
-};
+// Removed unused getHomeInfo since getHomeInfoPublic is used in controller
+// If getHomeInfo is needed elsewhere, keep it and export it
 
 export const getHomeInfoPublic = async () => {
     return await HomeInfo.findOne();
@@ -89,12 +84,12 @@ export const updateHomeInfo = async (data: any, files: Express.Multer.File[]) =>
         // If the user sends the text fields but NOT the image URL/File, should we keep the old image?
         // Usually, yes. 
         
-        const existingBanner = homeInfo.banner ? homeInfo.banner.toObject() : {};
+        const existingBanner = homeInfo.banner ? homeInfo.toObject().banner : {};
         homeInfo.banner = { ...existingBanner, ...data.banner };
     }
 
     if (data.benefits) {
-         const existingBenefits = homeInfo.benefits ? homeInfo.benefits.toObject() : {};
+         const existingBenefits = homeInfo.benefits ? homeInfo.toObject().benefits : {};
          // For arrays (items), we probably want to replace the list if provided, because it's "exactly 3 items".
          // But we need to preserve images if they are not in the payload but match existing items?
          // The prompt says "If an existing image URL is provided (not a file), keep it as-is".
@@ -121,7 +116,7 @@ export const updateHomeInfo = async (data: any, files: Express.Multer.File[]) =>
     }
 
     if (data.services) {
-        const existingServices = homeInfo.services ? homeInfo.services.toObject() : {};
+        const existingServices = homeInfo.services ? homeInfo.toObject().services : {};
         homeInfo.services = { ...existingServices, ...data.services };
     }
     

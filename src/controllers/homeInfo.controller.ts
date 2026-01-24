@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { getHomeInfo, getHomeInfoPublic, updateHomeInfo } from '../services/homeInfo.service';
+import { getHomeInfoPublic, updateHomeInfo } from '../services/homeInfo.service';
 import { homeInfoSchema } from '../validations/homeInfo.validations';
 import { ZodError } from 'zod';
 
@@ -23,14 +23,15 @@ const unflatten = (data: any): any => {
 };
 
 export const getHomeInfoController = async (
-  req: Request,
+  _req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const homeInfo = await getHomeInfoPublic();
     if (!homeInfo) {
-      return res.status(404).json({ success: false, message: 'Home info not found' });
+      res.status(404).json({ success: false, message: 'Home info not found' });
+      return;
     }
     res.status(200).json({ success: true, data: homeInfo });
   } catch (error) {
@@ -75,7 +76,7 @@ export const updateHomeInfoController = async (
         }
     } catch (error) {
         if (error instanceof ZodError) {
-             return res.status(400).json({
+             res.status(400).json({
                 success: false,
                 message: 'Validation failed',
                 errors: error.errors.map(e => ({
@@ -83,6 +84,7 @@ export const updateHomeInfoController = async (
                     message: e.message
                 }))
              });
+             return;
         }
         throw error;
     }
