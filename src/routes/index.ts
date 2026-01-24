@@ -10,6 +10,7 @@ import testimonialRoutes from './testimonial.routes';
 import contactRoutes from './contact.routes';
 import complianceRoutes from './compliance.routes';
 import calculatorRoutes from './calculator.routes';
+import homeInfoRoutes from './homeInfo.routes';
 import { apiRateLimiter } from '../middlewares/rateLimit.middleware';
 
 const router = Router();
@@ -29,6 +30,7 @@ router.use('/testimonials', testimonialRoutes);
 router.use('/contact', contactRoutes);
 router.use('/compliance', complianceRoutes);
 router.use('/calculators', calculatorRoutes);
+router.use('/home-info', homeInfoRoutes);
 
 export default router;
 

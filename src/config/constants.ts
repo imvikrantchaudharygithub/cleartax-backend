@@ -66,6 +66,7 @@ export const CLOUDINARY_FOLDERS = {
   TEAM_AVATARS: 'cleartax/team',
   COMPLIANCE_DOCS: 'cleartax/compliance',
   TESTIMONIALS: 'cleartax/testimonials',
+  HOME_INFO: 'cleartax/home-info',
 } as const;
 
 // Rate limiting
