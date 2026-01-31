@@ -20,8 +20,24 @@ const generateSlug = (title: string): string => {
     .replace(/^-+|-+$/g, '');
 };
 
+const ensureUniqueSlug = async (baseSlug: string, excludeId?: string): Promise<string> => {
+  let slug = baseSlug;
+  let counter = 1;
+  while (true) {
+    const existing = await Service.findOne({
+      slug,
+      ...(excludeId ? { _id: { $ne: excludeId } } : {}),
+    });
+    if (!existing) {
+      return slug;
+    }
+    slug = `${baseSlug}-${counter}`;
+    counter += 1;
+  }
+};
+
 export const createService = async (data: ServiceCreateRequest): Promise<ServiceResponse> => {
-  const slug = generateSlug(data.title);
+  const slug = data.slug || generateSlug(data.title);
 
   // Check if slug already exists
   const existingService = await Service.findOne({ slug });
@@ -32,6 +48,7 @@ export const createService = async (data: ServiceCreateRequest): Promise<Service
   const serviceData: any = {
     ...data,
     slug,
+    status: data.status || 'published',
   };
 
   // Handle category - can be ObjectId, category slug/id, or categoryName string
@@ -81,6 +98,237 @@ export const createService = async (data: ServiceCreateRequest): Promise<Service
   const service = await Service.create(serviceData);
 
   return service.toObject() as unknown as ServiceResponse;
+};
+
+export const createServiceDraft = async (data: ServiceUpdateRequest): Promise<ServiceResponse> => {
+  const baseSlug = data.slug || (data.title ? generateSlug(data.title) : `draft-${new mongoose.Types.ObjectId().toString()}`);
+  const slug = await ensureUniqueSlug(baseSlug);
+  const lastSavedAtInput = data.draftMeta?.lastSavedAt;
+  const parsedLastSavedAt = lastSavedAtInput ? new Date(lastSavedAtInput) : new Date();
+  const lastSavedAt = Number.isNaN(parsedLastSavedAt.getTime()) ? new Date() : parsedLastSavedAt;
+  const serviceData: any = {
+    ...data,
+    slug,
+    status: 'draft',
+    draftMeta: {
+      completionStep: data.draftMeta?.completionStep || 0,
+      lastSavedAt,
+    },
+  };
+
+  if (data.category) {
+    if (mongoose.Types.ObjectId.isValid(data.category)) {
+      serviceData.category = new mongoose.Types.ObjectId(data.category);
+    } else {
+      const categoryDoc = await ServiceCategory.findOne({
+        $or: [
+          { slug: data.category.toLowerCase() },
+          { id: data.category.toLowerCase() },
+        ],
+      });
+      if (categoryDoc) {
+        serviceData.category = categoryDoc._id;
+      } else {
+        serviceData.categoryName = data.category;
+      }
+    }
+  }
+
+  if ((data as any).subcategory) {
+    const subcategory = (data as any).subcategory;
+    if (mongoose.Types.ObjectId.isValid(subcategory)) {
+      serviceData.subcategory = new mongoose.Types.ObjectId(subcategory);
+    } else {
+      const subcategoryDoc = await ServiceCategory.findOne({
+        $or: [
+          { slug: subcategory.toLowerCase() },
+          { id: subcategory.toLowerCase() },
+        ],
+      });
+      if (subcategoryDoc) {
+        serviceData.subcategory = subcategoryDoc._id;
+      } else {
+        serviceData.subcategory = subcategory;
+      }
+    }
+  }
+
+  if (data.relatedServices && data.relatedServices.length > 0) {
+    serviceData.relatedServices = data.relatedServices.map((id) => new mongoose.Types.ObjectId(id));
+  }
+
+  const service = await Service.create(serviceData);
+  return service.toObject() as unknown as ServiceResponse;
+};
+
+export const updateServiceDraft = async (id: string, data: ServiceUpdateRequest): Promise<ServiceResponse> => {
+  const service = await Service.findById(id);
+
+  if (!service) {
+    throw new Error('Service not found');
+  }
+
+  if (service.status === 'published') {
+    throw new Error('Cannot update a published service via draft endpoint');
+  }
+
+  if (data.title && data.title !== service.title && !data.slug) {
+    const baseSlug = generateSlug(data.title);
+    data.slug = await ensureUniqueSlug(baseSlug, id);
+  }
+
+  if (data.relatedServices && data.relatedServices.length > 0) {
+    data.relatedServices = data.relatedServices.map((rid) => new mongoose.Types.ObjectId(rid)) as any;
+  }
+
+  if (data.category) {
+    if (mongoose.Types.ObjectId.isValid(data.category)) {
+      (data as any).category = new mongoose.Types.ObjectId(data.category);
+    } else {
+      const categoryDoc = await ServiceCategory.findOne({
+        $or: [
+          { slug: data.category.toLowerCase() },
+          { id: data.category.toLowerCase() },
+        ],
+      });
+      if (categoryDoc) {
+        (data as any).category = categoryDoc._id;
+      } else {
+        (data as any).categoryName = data.category;
+      }
+    }
+  }
+
+  if ((data as any).subcategory) {
+    const subcategory = (data as any).subcategory;
+    if (mongoose.Types.ObjectId.isValid(subcategory)) {
+      (data as any).subcategory = new mongoose.Types.ObjectId(subcategory);
+    } else {
+      const subcategoryDoc = await ServiceCategory.findOne({
+        $or: [
+          { slug: subcategory.toLowerCase() },
+          { id: subcategory.toLowerCase() },
+        ],
+      });
+      if (subcategoryDoc) {
+        (data as any).subcategory = subcategoryDoc._id;
+      }
+    }
+  }
+
+  const lastSavedAtInput = data.draftMeta?.lastSavedAt;
+  const parsedLastSavedAt = lastSavedAtInput ? new Date(lastSavedAtInput) : new Date();
+  const lastSavedAt = Number.isNaN(parsedLastSavedAt.getTime()) ? new Date() : parsedLastSavedAt;
+
+  (data as any).status = 'draft';
+  (data as any).draftMeta = {
+    completionStep: data.draftMeta?.completionStep ?? service.draftMeta?.completionStep ?? 0,
+    lastSavedAt,
+  };
+
+  Object.assign(service, data);
+  await service.save();
+
+  return service.toObject() as unknown as ServiceResponse;
+};
+
+export const getServiceDraftById = async (id: string): Promise<ServiceResponse> => {
+  const service = await Service.findOne({ _id: id, status: 'draft' })
+    .populate('relatedServices', '_id slug title shortDescription')
+    .lean();
+
+  if (!service) {
+    throw new Error('Service draft not found');
+  }
+
+  return service as unknown as ServiceResponse;
+};
+
+export const getServiceDrafts = async (query: ServiceQueryParams): Promise<ServiceResponse[]> => {
+  const filter: any = { status: 'draft' };
+
+  if (query.category) {
+    const categoryQuery = query.category.toLowerCase();
+    const categoryDoc = await ServiceCategory.findOne({
+      $or: [
+        { slug: categoryQuery },
+        { id: categoryQuery },
+      ],
+    }).lean();
+
+    if (categoryDoc) {
+      const categoryId = categoryDoc._id;
+      const categoryIdString = categoryId.toString();
+      filter.$or = [
+        { category: categoryIdString },
+        { category: categoryId },
+        { category: categoryDoc.slug },
+        { category: categoryDoc.id },
+        ...(categoryDoc.title ? [{ categoryName: { $regex: categoryDoc.title, $options: 'i' } }] : []),
+      ];
+    } else {
+      filter.$or = [
+        { category: categoryQuery },
+        { categoryName: { $regex: categoryQuery, $options: 'i' } },
+      ];
+    }
+  }
+
+  const drafts = await Service.find(filter)
+    .sort({ updatedAt: -1 })
+    .lean();
+
+  return drafts as unknown as ServiceResponse[];
+};
+
+export const publishServiceDraft = async (id: string): Promise<ServiceResponse> => {
+  const service = await Service.findById(id);
+
+  if (!service) {
+    throw new Error('Service draft not found');
+  }
+
+  if (service.status !== 'draft') {
+    throw new Error('Service is already published');
+  }
+
+  if (!service.title || !service.shortDescription || !service.longDescription || !service.iconName) {
+    throw new Error('Missing required fields to publish the service');
+  }
+
+  if (!service.price || service.price.min === undefined || service.price.max === undefined) {
+    throw new Error('Price information is required to publish the service');
+  }
+
+  if (!service.duration) {
+    throw new Error('Duration is required to publish the service');
+  }
+
+  if (!service.category && !service.categoryName) {
+    throw new Error('Category is required to publish the service');
+  }
+
+  const newSlug = service.slug || generateSlug(service.title);
+  const ensuredSlug = await ensureUniqueSlug(newSlug, id);
+  service.slug = ensuredSlug;
+  service.status = 'published';
+  service.draftMeta = {
+    ...(service.draftMeta || {}),
+    lastSavedAt: new Date(),
+  };
+
+  await service.save();
+  return service.toObject() as unknown as ServiceResponse;
+};
+
+export const deleteServiceDraft = async (id: string): Promise<void> => {
+  const service = await Service.findOne({ _id: id, status: 'draft' });
+
+  if (!service) {
+    throw new Error('Service draft not found');
+  }
+
+  await Service.deleteOne({ _id: id });
 };
 
 export const getServices = async (query: ServiceQueryParams) => {
@@ -195,11 +443,19 @@ export const getServices = async (query: ServiceQueryParams) => {
     ];
   }
 
+  if (!query.includeDrafts) {
+    filter.$or = [
+      ...(filter.$or || []),
+      { status: 'published' },
+      { status: { $exists: false } },
+    ];
+  }
+
   // Build query - don't use populate for category/subcategory as they might be strings
   // We'll handle population manually in the transformation
   // For categoryType queries, fetch all services and filter after transformation
   let serviceQuery = isCategoryTypeQuery 
-    ? Service.find({}) // Fetch all for categoryType filtering
+    ? Service.find(query.includeDrafts ? {} : { $or: [{ status: 'published' }, { status: { $exists: false } }] }) // Fetch all for categoryType filtering
     : Service.find(filter); // Use filter for specific category queries
   
   serviceQuery = serviceQuery
@@ -213,7 +469,7 @@ export const getServices = async (query: ServiceQueryParams) => {
 
   const [services, total, allCategories] = await Promise.all([
     serviceQuery.lean(),
-    isCategoryTypeQuery ? Service.countDocuments({}) : Service.countDocuments(filter),
+    isCategoryTypeQuery ? Service.countDocuments(query.includeDrafts ? {} : { $or: [{ status: 'published' }, { status: { $exists: false } }] }) : Service.countDocuments(filter),
     ServiceCategory.find().lean(), // Fetch all categories once for efficient lookup
   ]);
 
@@ -400,8 +656,12 @@ export const getServices = async (query: ServiceQueryParams) => {
   };
 };
 
-export const getServiceBySlug = async (slug: string, _category?: string): Promise<ServiceResponse & { category?: any; subcategories?: ServiceResponse[] }> => {
-  const service = await Service.findOne({ slug })
+export const getServiceBySlug = async (
+  slug: string,
+  _category?: string,
+  includeDrafts = false
+): Promise<ServiceResponse & { category?: any; subcategories?: ServiceResponse[] }> => {
+  const service = await Service.findOne(includeDrafts ? { slug } : { slug, status: 'published' })
     .populate('relatedServices', '_id slug title shortDescription')
     .lean();
 
@@ -515,11 +775,15 @@ export const getServiceBySlug = async (slug: string, _category?: string): Promis
   return transformed;
 };
 
-export const getServicesByCategory = async (category: string): Promise<{
+export const getServicesByCategory = async (
+  category: string,
+  includeDrafts = false
+): Promise<{
   services: ServiceResponse[];
   category: any;
   subcategories?: (ServiceResponse & { itemsCount?: number })[];
 }> => {
+  const serviceBaseFilter = includeDrafts ? {} : { $or: [{ status: 'published' }, { status: { $exists: false } }] };
   // First try to find by slug or id (specific category)
   let categoryDoc = await ServiceCategory.findOne({
     $or: [
@@ -568,6 +832,7 @@ export const getServicesByCategory = async (category: string): Promise<{
   if (!categoryDoc) {
     // Fallback: try to find services by category string directly
     const services = await Service.find({ 
+      ...(includeDrafts ? {} : { status: 'published' }),
       $or: [
         { category: category },
         { categoryName: { $regex: category, $options: 'i' } },
@@ -613,6 +878,7 @@ export const getServicesByCategory = async (category: string): Promise<{
   }
   
   const services = await Service.find({
+    ...serviceBaseFilter,
     $or: queryConditions,
   })
     .populate('relatedServices', '_id slug title shortDescription')
@@ -690,6 +956,7 @@ export const getServicesByCategory = async (category: string): Promise<{
       // Count services in this subcategory category
       // Handle services with category as ObjectId, string ObjectId, or categoryType string
       const itemsCount = await Service.countDocuments({
+        ...serviceBaseFilter,
         $or: [
           // Match by category field (as ObjectId)
           { category: cat._id },
@@ -760,6 +1027,7 @@ export const getServicesByCategory = async (category: string): Promise<{
       // Count services in this subcategory
       // Handle services with category as ObjectId, string ObjectId, or categoryType string
       const itemsCount = await Service.countDocuments({
+        ...serviceBaseFilter,
         $or: [
           // Match by category field (as ObjectId)
           { category: subService._id },

@@ -22,6 +22,11 @@ export interface IService extends Document {
   category: mongoose.Types.ObjectId | string; // Can be ObjectId reference or string for backward compatibility
   subcategory?: mongoose.Types.ObjectId | string; // Optional subcategory reference
   categoryName?: string; // String category name for filtering
+  status: 'draft' | 'published';
+  draftMeta?: {
+    completionStep?: number;
+    lastSavedAt?: Date;
+  };
   price: {
     min: number;
     max: number;
@@ -81,31 +86,41 @@ const ServiceSchema = new Schema<IService>(
   {
     slug: {
       type: String,
-      required: [true, 'Slug is required'],
+      required: function (this: any) {
+        return this.status === 'published';
+      },
       unique: true,
       trim: true,
       lowercase: true,
     },
     title: {
       type: String,
-      required: [true, 'Title is required'],
+      required: function (this: any) {
+        return this.status === 'published';
+      },
       trim: true,
       maxlength: [200, 'Title cannot exceed 200 characters'],
     },
     shortDescription: {
       type: String,
-      required: [true, 'Short description is required'],
+      required: function (this: any) {
+        return this.status === 'published';
+      },
       trim: true,
       maxlength: [500, 'Short description cannot exceed 500 characters'],
     },
     longDescription: {
       type: String,
-      required: [true, 'Long description is required'],
+      required: function (this: any) {
+        return this.status === 'published';
+      },
       trim: true,
     },
     iconName: {
       type: String,
-      required: [true, 'Icon name is required'],
+      required: function (this: any) {
+        return this.status === 'published';
+      },
       trim: true,
     },
     category: {
@@ -126,12 +141,16 @@ const ServiceSchema = new Schema<IService>(
     price: {
       min: {
         type: Number,
-        required: [true, 'Minimum price is required'],
+        required: function (this: any) {
+          return this.status === 'published';
+        },
         min: [0, 'Price must be positive'],
       },
       max: {
         type: Number,
-        required: [true, 'Maximum price is required'],
+        required: function (this: any) {
+          return this.status === 'published';
+        },
         min: [0, 'Price must be positive'],
       },
       currency: {
@@ -142,7 +161,9 @@ const ServiceSchema = new Schema<IService>(
     },
     duration: {
       type: String,
-      required: [true, 'Duration is required'],
+      required: function (this: any) {
+        return this.status === 'published';
+      },
       trim: true,
     },
     features: {
@@ -169,6 +190,21 @@ const ServiceSchema = new Schema<IService>(
       type: [Schema.Types.ObjectId],
       ref: 'Service',
       default: [],
+    },
+    status: {
+      type: String,
+      enum: ['draft', 'published'],
+      default: 'draft',
+      index: true,
+    },
+    draftMeta: {
+      completionStep: {
+        type: Number,
+        min: 0,
+      },
+      lastSavedAt: {
+        type: Date,
+      },
     },
   },
   {

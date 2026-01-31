@@ -24,6 +24,8 @@ export const getServicesBySubcategory = async (
 ): Promise<void> => {
   try {
     const { category, subcategory } = req.params;
+    const includeDrafts = req.query.includeDrafts === 'true';
+    const statusFilter = includeDrafts ? {} : { $or: [{ status: 'published' }, { status: { $exists: false } }] };
     
     // First, verify the category exists (could be slug, id, or categoryType)
     let categoryDoc = await ServiceCategory.findOne({
@@ -110,6 +112,7 @@ export const getServicesBySubcategory = async (
           
           // Try to find services with a more flexible query
           let services = await Service.find({
+            ...statusFilter,
             $or: queryConditions,
           })
             .populate('relatedServices', '_id slug title shortDescription')
@@ -121,6 +124,7 @@ export const getServicesBySubcategory = async (
           if (services.length === 0) {
             // Try finding by checking if category field contains the ID in any form
             services = await Service.find({
+              ...statusFilter,
               $or: [
                 { $expr: { $eq: [{ $toString: '$category' }, categoryIdString] } },
                 { $expr: { $eq: [{ $toString: '$subcategory' }, categoryIdString] } },
@@ -136,7 +140,9 @@ export const getServicesBySubcategory = async (
           // If still no services, try to find by checking all services and filtering in memory
           // This is a fallback for edge cases
           if (services.length === 0) {
-            const allServices = await Service.find({})
+            const allServices = await Service.find({
+              ...statusFilter,
+            })
               .populate('relatedServices', '_id slug title shortDescription')
               .sort({ createdAt: -1 })
               .lean();
@@ -1596,7 +1602,8 @@ export const getServicesByCategory = async (
 ): Promise<void> => {
   try {
     const { category } = req.params;
-    const result = await serviceService.getServicesByCategory(category);
+    const includeDrafts = req.query.includeDrafts === 'true';
+    const result = await serviceService.getServicesByCategory(category, includeDrafts);
     
     // Build response with category info and subcategories if available
     const response: any = {
@@ -1659,6 +1666,85 @@ export const createService = async (req: Request, res: Response, next: NextFunct
       success: true,
       data: service,
       message: 'Service created successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createServiceDraft = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const service = await serviceService.createServiceDraft(req.body);
+    res.status(201).json({
+      success: true,
+      data: service,
+      message: 'Service draft created successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateServiceDraft = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const service = await serviceService.updateServiceDraft(id, req.body);
+    res.status(200).json({
+      success: true,
+      data: service,
+      message: 'Service draft updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getServiceDraftById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const service = await serviceService.getServiceDraftById(id);
+    res.status(200).json({
+      success: true,
+      data: service,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getServiceDrafts = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const drafts = await serviceService.getServiceDrafts(req.query as any);
+    res.status(200).json({
+      success: true,
+      data: drafts,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const publishServiceDraft = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const service = await serviceService.publishServiceDraft(id);
+    res.status(200).json({
+      success: true,
+      data: service,
+      message: 'Service published successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteServiceDraft = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    await serviceService.deleteServiceDraft(id);
+    res.status(200).json({
+      success: true,
+      message: 'Service draft deleted successfully',
     });
   } catch (error) {
     next(error);

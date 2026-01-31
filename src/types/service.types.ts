@@ -17,12 +17,18 @@ export interface ServicePrice {
   currency: string;
 }
 
+export interface DraftMeta {
+  completionStep?: number;
+  lastSavedAt?: Date;
+}
+
 export interface ServiceCreateRequest {
   title: string;
   shortDescription: string;
   longDescription: string;
   iconName: string;
   category: string;
+  subcategory?: string;
   price: ServicePrice;
   duration: string;
   features: string[];
@@ -31,6 +37,9 @@ export interface ServiceCreateRequest {
   process: ProcessStep[];
   faqs: FAQ[];
   relatedServices?: string[];
+  status?: 'draft' | 'published';
+  draftMeta?: DraftMeta;
+  slug?: string;
 }
 
 export interface ServiceUpdateRequest extends Partial<ServiceCreateRequest> {
@@ -45,6 +54,7 @@ export interface ServiceResponse {
   longDescription: string;
   iconName: string;
   category: string;
+  subcategory?: string;
   price: ServicePrice;
   duration: string;
   features: string[];
@@ -53,6 +63,8 @@ export interface ServiceResponse {
   process: ProcessStep[];
   faqs: FAQ[];
   relatedServices: string[];
+  status?: 'draft' | 'published';
+  draftMeta?: DraftMeta;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -92,5 +104,6 @@ export interface ServiceQueryParams {
   limit?: number;
   category?: string; // Can be category slug, id, or categoryType
   search?: string;
+  includeDrafts?: boolean;
 }
 

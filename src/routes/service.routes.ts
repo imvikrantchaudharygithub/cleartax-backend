@@ -10,6 +10,9 @@ import {
   createServiceBySubcategorySchema,
   updateServiceByCategorySchema,
   updateServiceBySubcategorySchema,
+  createServiceDraftSchema,
+  updateServiceDraftSchema,
+  publishServiceDraftSchema,
 } from '../validations/service.validations';
 
 const router = Router();
@@ -18,6 +21,12 @@ const router = Router();
 router.get('/', validate(serviceQuerySchema), serviceController.getServices);
 router.get('/categories', serviceController.getServiceCategories);
 router.get('/categories/:id', serviceController.getServiceCategoryById);
+router.post('/draft', validate(createServiceDraftSchema), serviceController.createServiceDraft);
+router.put('/draft/:id', validate(updateServiceDraftSchema), serviceController.updateServiceDraft);
+router.get('/draft/:id', serviceController.getServiceDraftById);
+router.get('/drafts', serviceController.getServiceDrafts);
+router.delete('/draft/:id', serviceController.deleteServiceDraft);
+router.post('/publish/:id', validate(publishServiceDraftSchema), serviceController.publishServiceDraft);
 // Category CRUD routes must come before generic /:category route to avoid conflicts
 router.put('/categories/:id', validate(updateServiceCategorySchema), serviceController.updateServiceCategory);
 router.delete('/categories/:id', serviceController.deleteServiceCategory);

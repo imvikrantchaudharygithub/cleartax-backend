@@ -20,6 +20,7 @@ export const createServiceSchema = z.object({
     longDescription: z.string().min(1, 'Long description is required'),
     iconName: z.string().min(1, 'Icon name is required'),
     category: z.string().min(1, 'Category is required'),
+    subcategory: z.string().optional(),
     price: z.object({
       min: z.number().min(0, 'Minimum price must be positive'),
       max: z.number().min(0, 'Maximum price must be positive'),
@@ -32,6 +33,12 @@ export const createServiceSchema = z.object({
     process: z.array(processStepSchema).default([]),
     faqs: z.array(faqSchema).default([]),
     relatedServices: z.array(z.string()).optional(),
+    status: z.enum(['draft', 'published']).optional(),
+    draftMeta: z.object({
+      completionStep: z.number().int().min(0).optional(),
+      lastSavedAt: z.string().optional(),
+    }).optional(),
+    slug: z.string().optional(),
   }),
 });
 
@@ -48,6 +55,10 @@ export const serviceQuerySchema = z.object({
     limit: z.string().regex(/^\d+$/).transform(Number).optional(),
     category: z.string().optional(),
     search: z.string().optional(),
+    includeDrafts: z
+      .string()
+      .transform((value) => value === 'true')
+      .optional(),
   }),
 });
 
@@ -112,5 +123,55 @@ export const updateServiceBySubcategorySchema = z.object({
     slug: z.string().min(1, 'Slug is required'),
   }),
   body: createServiceSchema.shape.body.partial(),
+});
+
+const draftNumber = z.preprocess((value) => {
+  if (value === '' || value === null || value === undefined) return undefined;
+  if (typeof value === 'string') return Number(value);
+  return value;
+}, z.number().optional());
+
+const draftBodySchema = z.object({
+  title: z.string().optional(),
+  shortDescription: z.string().optional(),
+  longDescription: z.string().optional(),
+  iconName: z.string().optional(),
+  category: z.string().optional(),
+  subcategory: z.string().optional(),
+  price: z.object({
+    min: draftNumber,
+    max: draftNumber,
+    currency: z.string().optional(),
+  }).optional(),
+  duration: z.string().optional(),
+  features: z.array(z.string()).optional(),
+  benefits: z.array(z.string()).optional(),
+  requirements: z.array(z.string()).optional(),
+  process: z.array(processStepSchema).optional(),
+  faqs: z.array(faqSchema).optional(),
+  relatedServices: z.array(z.string()).optional(),
+  status: z.enum(['draft', 'published']).optional(),
+  draftMeta: z.object({
+    completionStep: z.number().int().min(0).optional(),
+    lastSavedAt: z.string().optional(),
+  }).optional(),
+  slug: z.string().optional(),
+});
+
+export const createServiceDraftSchema = z.object({
+  body: draftBodySchema,
+});
+
+export const updateServiceDraftSchema = z.object({
+  params: z.object({
+    id: z.string().min(1, 'Service ID is required'),
+  }),
+  body: draftBodySchema,
+});
+
+export const publishServiceDraftSchema = z.object({
+  params: z.object({
+    id: z.string().min(1, 'Service ID is required'),
+  }),
 });
 
