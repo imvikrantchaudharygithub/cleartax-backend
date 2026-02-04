@@ -400,11 +400,9 @@ export const getServicesBySubcategory = async (
             return getServiceBySlug(req, res, next);
           }
           
-          res.status(404).json({
-            success: false,
-            message: 'Subcategory not found',
-          });
-          return;
+          // Fallback: treat second segment as service slug (e.g. GST detail pages)
+          req.params.slug = subcategory;
+          return getServiceBySlug(req, res, next);
         }
       }
     }
@@ -749,10 +747,9 @@ export const getServicesBySubcategory = async (
       return;
     }
     
-    res.status(404).json({
-      success: false,
-      message: 'Subcategory not found',
-    });
+    // Fallback: treat second segment as service slug (e.g. GST detail pages)
+    req.params.slug = subcategory;
+    return getServiceBySlug(req, res, next);
   } catch (error) {
     next(error);
   }
@@ -1063,7 +1060,6 @@ export const getServiceBySubcategorySlug = async (
 export const getServiceBySlug = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { slug, category } = req.params;
-    
     // First, try to find the category (could be slug, id, or categoryType)
     let categoryDoc = await ServiceCategory.findOne({
       $or: [

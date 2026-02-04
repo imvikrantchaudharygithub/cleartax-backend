@@ -661,10 +661,42 @@ export const getServiceBySlug = async (
   _category?: string,
   includeDrafts = false
 ): Promise<ServiceResponse & { category?: any; subcategories?: ServiceResponse[] }> => {
-  const service = await Service.findOne(includeDrafts ? { slug } : { slug, status: 'published' })
+  let service = await Service.findOne(includeDrafts ? { slug } : { slug, status: 'published' })
     .populate('relatedServices', '_id slug title shortDescription')
     .lean();
 
+  if (!service && _category) {
+    // Fallback: request slug may be longer than stored slug (e.g. "revocation-of-gst-registration" vs "revocation")
+    const categoryDoc = await ServiceCategory.findOne({
+      $or: [
+        { slug: _category.toLowerCase() },
+        { id: _category.toLowerCase() },
+        { categoryType: _category.toLowerCase() },
+      ],
+    }).lean();
+    if (categoryDoc) {
+      const categoryId = categoryDoc._id.toString();
+      const statusFilter = includeDrafts ? {} : { $or: [{ status: 'published' }, { status: { $exists: false } }] };
+      const inCategory = await Service.find({
+        ...statusFilter,
+        $or: [
+          { category: categoryId },
+          { category: new mongoose.Types.ObjectId(categoryId) },
+          { category: _category.toLowerCase() },
+        ],
+      })
+        .populate('relatedServices', '_id slug title shortDescription')
+        .lean();
+      const slugLower = slug.toLowerCase();
+      const matches = (inCategory as any[]).filter(
+        (s: any) => slugLower === (s.slug || '').toLowerCase() || slugLower.startsWith((s.slug || '').toLowerCase() + '-')
+      );
+      if (matches.length > 0) {
+        const best = matches.reduce((a, b) => ((a.slug || '').length >= (b.slug || '').length ? a : b));
+        service = best as any;
+      }
+    }
+  }
   if (!service) {
     throw new Error('Service not found');
   }
@@ -783,7 +815,7 @@ export const getServicesByCategory = async (
   category: any;
   subcategories?: (ServiceResponse & { itemsCount?: number })[];
 }> => {
-  const serviceBaseFilter = includeDrafts ? {} : { $or: [{ status: 'published' }, { status: { $exists: false } }] };
+  const serviceBaseFilter = includeDrafts ? {} : { $or: [{ status: 'published' }, { status: { $exists: false } }, { status: null }] };
   // First try to find by slug or id (specific category)
   let categoryDoc = await ServiceCategory.findOne({
     $or: [
@@ -859,8 +891,7 @@ export const getServicesByCategory = async (
   // For virtual parent categories, search by categoryType string
   const queryConditions: any[] = [
     { categoryName: { $regex: categoryDoc.title, $options: 'i' } }, // Match by title
-    { category: categoryDoc.slug }, // Match by slug
-    { category: categoryDoc.id }, // Match by id
+    { category: categoryDoc.slug }, // Match by slug (unique per category)
   ];
   
   // Only add ObjectId-based queries if categoryId is not null (not a virtual parent)
@@ -868,7 +899,16 @@ export const getServicesByCategory = async (
     queryConditions.push(
       { category: categoryIdString }, // Match string ObjectId (primary)
       { category: categoryId }, // Match ObjectId
-      { category: new mongoose.Types.ObjectId(categoryIdString) } // Match as ObjectId
+      { category: new mongoose.Types.ObjectId(categoryIdString) }, // Match as ObjectId
+      // Services under subcategories often have category: parentType and subcategory: this category's ObjectId
+      { subcategory: categoryIdString },
+      { subcategory: categoryId },
+      { subcategory: new mongoose.Types.ObjectId(categoryIdString) },
+      // Match subcategory stored as string slug (unique per category; avoid id to prevent over-match)
+      { subcategory: categoryDoc.slug },
+      // Type-safe match: coerce DB value to string (handles Mixed ObjectId vs string)
+      { $expr: { $eq: [{ $toString: '$subcategory' }, categoryIdString] } },
+      { $expr: { $eq: [{ $toString: '$category' }, categoryIdString] } }
     );
   } else {
     // For virtual parent, also search by categoryType string
@@ -877,13 +917,70 @@ export const getServicesByCategory = async (
     );
   }
   
-  const services = await Service.find({
+  let services = await Service.find({
     ...serviceBaseFilter,
     $or: queryConditions,
   })
     .populate('relatedServices', '_id slug title shortDescription')
     .sort({ createdAt: -1 })
     .lean();
+
+  // Fallback: when no services matched, try explicit subcategory/category refs only (no slug/title regex to avoid over-count)
+  if (services.length === 0 && categoryId) {
+    const fallbackConditions: any[] = [
+      { subcategory: categoryDoc.slug },
+      { category: categoryDoc.slug },
+    ];
+    if (categoryDoc.categoryType) {
+      const ct = categoryDoc.categoryType;
+      fallbackConditions.push(
+        { category: ct, subcategory: categoryIdString },
+        { category: ct, subcategory: categoryId },
+        { category: ct, subcategory: categoryDoc.slug }
+      );
+    }
+    const fallbackServices = await Service.find({
+      ...serviceBaseFilter,
+      $or: fallbackConditions,
+    })
+      .populate('relatedServices', '_id slug title shortDescription')
+      .sort({ createdAt: -1 })
+      .lean();
+    if (fallbackServices.length > 0) {
+      services = fallbackServices;
+    }
+  }
+
+  // Second fallback: when still 0 and this is a subcategory (has categoryType), match by slug pattern
+  // IMPORTANT: Use the SAME regex pattern as the controller (lines 95-110 in service.controller.ts)
+  if (services.length === 0 && categoryId && categoryDoc.categoryType && categoryDoc.slug) {
+    const ct = categoryDoc.categoryType;
+    const slugPattern = categoryDoc.slug.replace(/-/g, '[-_]?');
+    const titlePattern = categoryDoc.title ? categoryDoc.title.split(' ').join('|') : '';
+    
+    const fallbackServices = await Service.find({
+      ...serviceBaseFilter,
+      $and: [
+        { category: ct },
+        { $or: [{ subcategory: { $exists: false } }, { subcategory: null }, { subcategory: '' }] },
+        {
+          $or: [
+            { slug: { $regex: slugPattern, $options: 'i' } },
+            ...(categoryDoc.id ? [{ slug: { $regex: categoryDoc.id.replace(/-/g, '[-_]?'), $options: 'i' } }] : []),
+            ...(titlePattern ? [{ title: { $regex: titlePattern, $options: 'i' } }] : []),
+          ],
+        },
+      ],
+    })
+      .populate('relatedServices', '_id slug title shortDescription')
+      .sort({ createdAt: -1 })
+      .lean();
+    if (fallbackServices.length > 0) {
+      services = fallbackServices;
+    }
+  }
+
+  
 
   // Transform services with category info
   const transformedServices = services.map((service: any) => {
@@ -955,44 +1052,90 @@ export const getServicesByCategory = async (
       
       // Count services in this subcategory category
       // Handle services with category as ObjectId, string ObjectId, or categoryType string
-      const itemsCount = await Service.countDocuments({
-        ...serviceBaseFilter,
-        $or: [
-          // Match by category field (as ObjectId)
-          { category: cat._id },
-          // Match by category field (as string ObjectId)
-          { category: categoryId },
-          // Match by category field (as new ObjectId)
-          { category: new mongoose.Types.ObjectId(categoryId) },
-          // Match by subcategory field (as ObjectId)
-          { subcategory: cat._id },
-          // Match by subcategory field (as string ObjectId)
-          { subcategory: categoryId },
-          // Match by subcategory field (as new ObjectId)
-          { subcategory: new mongoose.Types.ObjectId(categoryId) },
-          // Match by categoryName (for backward compatibility)
-          { categoryName: { $regex: cat.title, $options: 'i' } },
-          // Match by slug/id in category field (if stored as string)
-          { category: cat.slug },
-          { category: cat.id },
-          // IMPORTANT: Handle services with category as categoryType string (e.g., "banking-finance")
-          // AND try to match by slug/title keywords to determine if they belong to this subcategory
-          {
-            $and: [
-              { category: cat.categoryType }, // category is "banking-finance" (string)
-              {
-                $or: [
-                  // Try to match by slug containing subcategory keywords
-                  { slug: { $regex: cat.slug.replace(/-/g, '[-_]?'), $options: 'i' } },
-                  { slug: { $regex: cat.id.replace(/-/g, '[-_]?'), $options: 'i' } },
-                  // Match by title containing subcategory keywords
-                  { title: { $regex: cat.title.split(' ').join('|'), $options: 'i' } },
-                ],
-              },
+      // Base query: match by ObjectId refs and slugs
+      // For subcategories with categoryType, use a COMBINED approach:
+      // 1. First count services linked by ID (explicit linkage)
+      // 2. Then add services matched by slug pattern (implicit linkage)
+      let itemsCount = 0;
+      if (cat.categoryType && cat.slug) {
+        // Step 1: Count services explicitly linked by subcategory ID
+        const byIdQuery = {
+          ...serviceBaseFilter,
+          $or: [
+            { category: cat._id },
+            { category: categoryId },
+            { category: new mongoose.Types.ObjectId(categoryId) },
+            { subcategory: cat._id },
+            { subcategory: categoryId },
+            { subcategory: new mongoose.Types.ObjectId(categoryId) },
+            { $expr: { $eq: [{ $toString: '$category' }, categoryId] } },
+            { $expr: { $eq: [{ $toString: '$subcategory' }, categoryId] } },
+          ],
+        };
+        const byIdCount = await Service.countDocuments(byIdQuery);
+        
+        // Step 2: Count services with slug/title pattern matching (but NOT already linked)
+        const slugPattern = cat.slug.replace(/-/g, '[-_]?');
+        const titlePattern = cat.title ? cat.title.split(' ').join('|') : '';
+        
+        const byPatternCount = await Service.countDocuments({
+          ...serviceBaseFilter,
+          $and: [
+            { category: cat.categoryType },
+            { $or: [{ subcategory: { $exists: false } }, { subcategory: null }, { subcategory: '' }] },
+            {
+              $or: [
+                { slug: { $regex: slugPattern, $options: 'i' } },
+                ...(cat.id ? [{ slug: { $regex: cat.id.replace(/-/g, '[-_]?'), $options: 'i' } }] : []),
+                ...(titlePattern ? [{ title: { $regex: titlePattern, $options: 'i' } }] : []),
+              ],
+            },
+          ],
+        });
+        
+        itemsCount = byIdCount + byPatternCount;
+        
+        // Final fallback: Use controller's comprehensive query (all conditions from service.controller.ts lines 69-111)
+        if (itemsCount === 0) {
+          const comprehensiveQuery = {
+            ...serviceBaseFilter,
+            $or: [
+              // Match by ID variations
+              { category: categoryId },
+              { category: cat._id },
+              { subcategory: categoryId },
+              { subcategory: cat._id },
+              // Match by slug/id string
+              { category: cat.slug },
+              { category: cat.id },
+              { subcategory: cat.slug },
+              { subcategory: cat.id },
+              // Match by title regex
+              { categoryName: { $regex: cat.title, $options: 'i' } },
             ],
-          },
-        ],
-      });
+          };
+          itemsCount = await Service.countDocuments(comprehensiveQuery);
+        }
+      } else {
+        // For regular subcategories without categoryType, use the standard query
+        const countQuery = {
+          ...serviceBaseFilter,
+          $or: [
+            { category: cat._id },
+            { category: categoryId },
+            { category: new mongoose.Types.ObjectId(categoryId) },
+            { subcategory: cat._id },
+            { subcategory: categoryId },
+            { subcategory: new mongoose.Types.ObjectId(categoryId) },
+            { categoryName: { $regex: cat.title, $options: 'i' } },
+            { category: cat.slug },
+            { subcategory: cat.slug },
+            { $expr: { $eq: [{ $toString: '$subcategory' }, categoryId] } },
+            { $expr: { $eq: [{ $toString: '$category' }, categoryId] } },
+          ],
+        };
+        itemsCount = await Service.countDocuments(countQuery);
+      }
       
       return {
         _id: cat._id.toString(),
@@ -1024,42 +1167,45 @@ export const getServicesByCategory = async (
     const subcategoryPromises = (categoryDoc.subServices as any[]).map(async (subService: any) => {
       const subcategoryId = subService._id.toString();
       
-      // Count services in this subcategory
-      // Handle services with category as ObjectId, string ObjectId, or categoryType string
-      const itemsCount = await Service.countDocuments({
-        ...serviceBaseFilter,
-        $or: [
-          // Match by category field (as ObjectId)
-          { category: subService._id },
-          // Match by category field (as string ObjectId)
-          { category: subcategoryId },
-          // Match by category field (as new ObjectId)
-          { category: new mongoose.Types.ObjectId(subcategoryId) },
-          // Match by subcategory field (as ObjectId)
-          { subcategory: subService._id },
-          // Match by subcategory field (as string ObjectId)
-          { subcategory: subcategoryId },
-          // Match by subcategory field (as new ObjectId)
-          { subcategory: new mongoose.Types.ObjectId(subcategoryId) },
-          // Match by categoryName (for backward compatibility)
-          { categoryName: { $regex: subService.title || subService.shortDescription || '', $options: 'i' } },
-          // Match by slug/id in category field (if stored as string)
-          { category: subService.slug },
-          // IMPORTANT: Handle services with category as categoryType string
-          // AND try to match by slug/title keywords
-          ...(subService.categoryType ? [{
-            $and: [
-              { category: subService.categoryType },
-              {
-                $or: [
-                  { slug: { $regex: subService.slug?.replace(/-/g, '[-_]?') || '', $options: 'i' } },
-                  { title: { $regex: (subService.title || '').split(' ').join('|'), $options: 'i' } },
-                ],
-              },
-            ],
-          }] : []),
-        ],
-      });
+      // For subcategories with categoryType, ALWAYS use the controller's query logic
+      let itemsCount = 0;
+      if ((subService as any).categoryType && subService.slug) {
+        const slugPattern = subService.slug.replace(/-/g, '[-_]?');
+        const titlePattern = subService.title ? subService.title.split(' ').join('|') : '';
+        
+        itemsCount = await Service.countDocuments({
+          ...serviceBaseFilter,
+          $and: [
+            { category: (subService as any).categoryType },
+            { $or: [{ subcategory: { $exists: false } }, { subcategory: null }, { subcategory: '' }] },
+            {
+              $or: [
+                { slug: { $regex: slugPattern, $options: 'i' } },
+                ...(subService.id ? [{ slug: { $regex: subService.id.replace(/-/g, '[-_]?'), $options: 'i' } }] : []),
+                ...(titlePattern ? [{ title: { $regex: titlePattern, $options: 'i' } }] : []),
+              ],
+            },
+          ],
+        });
+      } else {
+        // For regular subcategories without categoryType, use the standard query
+        itemsCount = await Service.countDocuments({
+          ...serviceBaseFilter,
+          $or: [
+            { category: subService._id },
+            { category: subcategoryId },
+            { category: new mongoose.Types.ObjectId(subcategoryId) },
+            { subcategory: subService._id },
+            { subcategory: subcategoryId },
+            { subcategory: new mongoose.Types.ObjectId(subcategoryId) },
+            { categoryName: { $regex: subService.title || subService.shortDescription || '', $options: 'i' } },
+            { category: subService.slug },
+            { subcategory: subService.slug },
+            { $expr: { $eq: [{ $toString: '$subcategory' }, subcategoryId] } },
+            { $expr: { $eq: [{ $toString: '$category' }, subcategoryId] } },
+          ],
+        });
+      }
       
       return {
         _id: subService._id.toString(),
