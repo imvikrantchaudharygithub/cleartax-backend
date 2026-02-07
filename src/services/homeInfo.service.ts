@@ -1,4 +1,5 @@
 import { HomeInfo } from '../models/HomeInfo.model';
+import type { IBanner } from '../models/HomeInfo.model';
 import { uploadToCloudinary, deleteFromCloudinary } from './fileUpload.service';
 import { CLOUDINARY_FOLDERS } from '../config/constants';
 
@@ -88,7 +89,7 @@ export const updateHomeInfo = async (data: any, files: Express.Multer.File[]) =>
     // We merge the new data into the existing document
     
     if (data.banner) {
-        const existingBanner = homeInfo.banner ? homeInfo.toObject().banner : {};
+        const existingBanner: Partial<IBanner> = homeInfo.banner ? (homeInfo.toObject().banner as IBanner) : {};
         const newHeroImages = Array.isArray(data.banner.heroImages) ? data.banner.heroImages : existingBanner.heroImages;
         const existingHeroPublicIds = (existingBanner.heroImages || []).map((img: any) => img.publicId).filter(Boolean);
         const newHeroPublicIds = (newHeroImages || []).map((img: any) => img.publicId).filter(Boolean);
