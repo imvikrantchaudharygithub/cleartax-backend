@@ -9,6 +9,7 @@ export const createTeamMemberSchema = z.object({
     linkedin: z.string().url('Invalid LinkedIn URL'),
     avatar: z.string().url('Invalid avatar URL').optional(),
     accent: z.string().optional(),
+    focusOn: z.string().optional(),
   }),
 });
 

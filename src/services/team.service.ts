@@ -1,9 +1,12 @@
+import mongoose from 'mongoose';
 import { Team } from '../models/Team.model';
 import {
   TeamMemberCreateRequest,
   TeamMemberUpdateRequest,
   TeamMemberResponse,
 } from '../types/team.types';
+
+const isMongoId = (s: string) => /^[a-fA-F0-9]{24}$/.test(s);
 
 export const getTeamMembers = async (): Promise<TeamMemberResponse[]> => {
   const members = await Team.find().sort({ createdAt: -1 }).lean();
@@ -36,7 +39,10 @@ export const updateTeamMember = async (
   id: string,
   data: TeamMemberUpdateRequest
 ): Promise<TeamMemberResponse> => {
-  const member = await Team.findOneAndUpdate({ id }, data, { new: true }).lean();
+  const filter = isMongoId(id)
+    ? { _id: new mongoose.Types.ObjectId(id) }
+    : { id };
+  const member = await Team.findOneAndUpdate(filter, data, { new: true }).lean();
 
   if (!member) {
     throw new Error('Team member not found');
@@ -46,8 +52,10 @@ export const updateTeamMember = async (
 };
 
 export const deleteTeamMember = async (id: string): Promise<void> => {
-  const member = await Team.findOneAndDelete({ id });
-
+  const filter = isMongoId(id)
+    ? { _id: new mongoose.Types.ObjectId(id) }
+    : { id };
+  const member = await Team.findOneAndDelete(filter);
   if (!member) {
     throw new Error('Team member not found');
   }

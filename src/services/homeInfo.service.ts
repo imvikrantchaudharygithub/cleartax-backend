@@ -12,25 +12,48 @@ export const getHomeInfoPublic = async () => {
 export const updateHomeInfo = async (data: any, files: Express.Multer.File[]) => {
   let homeInfo = await HomeInfo.findOne();
 
+  // Ensure banner.heroImages array exists when processing hero image uploads
+  if (data.banner && !Array.isArray(data.banner.heroImages)) {
+    data.banner.heroImages = [];
+  }
+
   // Handle file uploads
   if (files && files.length > 0) {
     for (const file of files) {
       const fieldName = file.fieldname;
       const uploadResult = await uploadToCloudinary(file, CLOUDINARY_FOLDERS.HOME_INFO);
 
-      // Map field name to data structure and delete old image if exists
+      // Hero images array: banner[heroImages][index][file]
+      const heroImageFileMatch = fieldName.match(/^banner\[heroImages\]\[(\d+)\]\[file\]$/);
+      if (heroImageFileMatch) {
+        const index = parseInt(heroImageFileMatch[1], 10);
+        if (!data.banner) data.banner = {};
+        if (!Array.isArray(data.banner.heroImages)) data.banner.heroImages = [];
+        while (data.banner.heroImages.length <= index) {
+          data.banner.heroImages.push({ url: '', alt: '', publicId: '' });
+        }
+        const existingAtIdx = homeInfo?.banner?.heroImages?.[index]?.publicId || data.banner.heroImages[index]?.publicId;
+        if (existingAtIdx) {
+          await deleteFromCloudinary(existingAtIdx);
+        }
+        const existingAlt = data.banner.heroImages[index]?.alt ?? '';
+        data.banner.heroImages[index] = {
+          url: uploadResult.secureUrl,
+          publicId: uploadResult.publicId,
+          alt: existingAlt,
+        };
+        continue;
+      }
+
+      // Legacy single hero image
       if (fieldName === 'banner[heroImageFile]') {
         if (!data.banner) data.banner = {};
-        
-        // Delete old image if exists
         if (homeInfo?.banner?.heroImagePublicId) {
           await deleteFromCloudinary(homeInfo.banner.heroImagePublicId);
         }
-
         data.banner.heroImage = uploadResult.secureUrl;
         data.banner.heroImagePublicId = uploadResult.publicId;
-      } 
-      else if (fieldName.match(/^benefits\[items\]\[(\d+)\]\[imageFile\]$/)) {
+      } else if (fieldName.match(/^benefits\[items\]\[(\d+)\]\[imageFile\]$/)) {
         const match = fieldName.match(/^benefits\[items\]\[(\d+)\]\[imageFile\]$/);
         if (match) {
             const index = parseInt(match[1]);
@@ -65,26 +88,15 @@ export const updateHomeInfo = async (data: any, files: Express.Multer.File[]) =>
     // We merge the new data into the existing document
     
     if (data.banner) {
-        // For sub-documents, we want to merge properties, but replacing arrays like checklistItems usually makes sense 
-        // unless we want to merge them index by index which is complex.
-        // Prompt says: "If a section is not provided in the request, keep the existing values for that section."
-        // It doesn't explicitly say about partial updates WITHIN a section, but usually PUT updates the resource. 
-        // Since we allow partial updates to the DOCUMENT (e.g. only update banner), 
-        // we should probably replace the sub-document if provided, or merge carefully.
-        // Mongoose updates: assigning an object to a nested path replaces it?
-        // Actually, if we do homeInfo.banner = data.banner, it might lose fields not in data.banner.
-        // However, the validation requires all fields for a section if provided?
-        // "Banner Section: heading: Required..."
-        // The validation in `homeInfo.validation.ts` defines schemas for sections.
-        // If I validate the incoming data with that schema, it ensures all required fields are present for that section.
-        // So I can safely replace the section.
-        
-        // However, I need to preserve images if not provided in the update but exist in DB.
-        // "If an existing image URL is provided (not a file), keep it as-is"
-        // If the user sends the text fields but NOT the image URL/File, should we keep the old image?
-        // Usually, yes. 
-        
         const existingBanner = homeInfo.banner ? homeInfo.toObject().banner : {};
+        const newHeroImages = Array.isArray(data.banner.heroImages) ? data.banner.heroImages : existingBanner.heroImages;
+        const existingHeroPublicIds = (existingBanner.heroImages || []).map((img: any) => img.publicId).filter(Boolean);
+        const newHeroPublicIds = (newHeroImages || []).map((img: any) => img.publicId).filter(Boolean);
+        for (const publicId of existingHeroPublicIds) {
+          if (!newHeroPublicIds.includes(publicId)) {
+            await deleteFromCloudinary(publicId);
+          }
+        }
         homeInfo.banner = { ...existingBanner, ...data.banner };
     }
 

@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+const heroImageItemSchema = z.object({
+  url: z.string().url('Hero image URL must be valid').optional().or(z.literal('')),
+  alt: z.string().max(200).optional(),
+  publicId: z.string().optional(),
+});
+
 const bannerSchema = z.object({
   heading: z.string().max(200, 'Heading must be less than 200 characters'),
   description: z.string().max(500, 'Description must be less than 500 characters'),
@@ -8,6 +14,7 @@ const bannerSchema = z.object({
   checklistItems: z.array(z.string().max(100)).length(3, 'Exactly 3 checklist items are required'),
   heroImage: z.string().url('Hero image must be a valid URL').optional().or(z.literal('')),
   heroImageAlt: z.string().max(200).optional(),
+  heroImages: z.array(heroImageItemSchema).optional(),
 });
 
 const benefitItemSchema = z.object({

@@ -1,5 +1,11 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export interface IHeroImageItem {
+  url: string;
+  alt?: string;
+  publicId?: string;
+}
+
 export interface IBanner {
   heading: string;
   description: string;
@@ -9,6 +15,7 @@ export interface IBanner {
   heroImage?: string;
   heroImageAlt?: string;
   heroImagePublicId?: string;
+  heroImages?: IHeroImageItem[];
 }
 
 export interface IBenefitItem {
@@ -69,6 +76,16 @@ const HomeInfoSchema = new Schema<IHomeInfo>(
       heroImage: { type: String },
       heroImageAlt: { type: String },
       heroImagePublicId: { type: String },
+      heroImages: {
+        type: [
+          {
+            url: { type: String },
+            alt: { type: String },
+            publicId: { type: String },
+          },
+        ],
+        default: [],
+      },
     },
     benefits: {
       heading: { type: String, required: true },

@@ -6,6 +6,7 @@ export interface TeamMemberCreateRequest {
   linkedin: string;
   avatar?: string;
   accent?: string;
+  focusOn?: string;
 }
 
 export interface TeamMemberUpdateRequest extends Partial<TeamMemberCreateRequest> {}
@@ -19,6 +20,7 @@ export interface TeamMemberResponse {
   linkedin: string;
   avatar?: string;
   accent?: string;
+  focusOn?: string;
   createdAt: Date;
   updatedAt: Date;
 }

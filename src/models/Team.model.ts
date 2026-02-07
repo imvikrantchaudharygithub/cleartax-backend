@@ -8,6 +8,7 @@ export interface ITeam extends Document {
   linkedin: string;
   avatar?: string;
   accent?: string;
+  focusOn?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -50,6 +51,10 @@ const TeamSchema = new Schema<ITeam>(
       trim: true,
     },
     accent: {
+      type: String,
+      trim: true,
+    },
+    focusOn: {
       type: String,
       trim: true,
     },
