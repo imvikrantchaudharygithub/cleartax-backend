@@ -892,6 +892,7 @@ export const getServicesByCategory = async (
   const queryConditions: any[] = [
     { categoryName: { $regex: categoryDoc.title, $options: 'i' } }, // Match by title
     { category: categoryDoc.slug }, // Match by slug (unique per category)
+    { category: categoryDoc.id }, // Match by category id (e.g. "gst", "registration") — services often store id not slug
   ];
   
   // Only add ObjectId-based queries if categoryId is not null (not a virtual parent)
@@ -904,8 +905,9 @@ export const getServicesByCategory = async (
       { subcategory: categoryIdString },
       { subcategory: categoryId },
       { subcategory: new mongoose.Types.ObjectId(categoryIdString) },
-      // Match subcategory stored as string slug (unique per category; avoid id to prevent over-match)
+      // Match subcategory stored as string slug or id
       { subcategory: categoryDoc.slug },
+      { subcategory: categoryDoc.id },
       // Type-safe match: coerce DB value to string (handles Mixed ObjectId vs string)
       { $expr: { $eq: [{ $toString: '$subcategory' }, categoryIdString] } },
       { $expr: { $eq: [{ $toString: '$category' }, categoryIdString] } }
@@ -924,19 +926,21 @@ export const getServicesByCategory = async (
     .populate('relatedServices', '_id slug title shortDescription')
     .sort({ createdAt: -1 })
     .lean();
-
   // Fallback: when no services matched, try explicit subcategory/category refs only (no slug/title regex to avoid over-count)
   if (services.length === 0 && categoryId) {
     const fallbackConditions: any[] = [
       { subcategory: categoryDoc.slug },
       { category: categoryDoc.slug },
+      { subcategory: categoryDoc.id },
+      { category: categoryDoc.id },
     ];
     if (categoryDoc.categoryType) {
       const ct = categoryDoc.categoryType;
       fallbackConditions.push(
         { category: ct, subcategory: categoryIdString },
         { category: ct, subcategory: categoryId },
-        { category: ct, subcategory: categoryDoc.slug }
+        { category: ct, subcategory: categoryDoc.slug },
+        { category: ct, subcategory: categoryDoc.id }
       );
     }
     const fallbackServices = await Service.find({
@@ -979,8 +983,6 @@ export const getServicesByCategory = async (
       services = fallbackServices;
     }
   }
-
-  
 
   // Transform services with category info
   const transformedServices = services.map((service: any) => {
