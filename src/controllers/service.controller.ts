@@ -296,6 +296,7 @@ export const getServicesBySubcategory = async (
               iconName: subcategoryCategory.iconName,
               heroTitle: subcategoryCategory.heroTitle,
               heroDescription: subcategoryCategory.heroDescription,
+              heroStats: subcategoryCategory.heroStats,
               categoryType: subcategoryCategory.categoryType,
               itemsCount: transformedServices.length, // Number of services in this subcategory
             },
@@ -644,6 +645,7 @@ export const getServicesBySubcategory = async (
           iconName: subcategoryCategory.iconName,
           heroTitle: subcategoryCategory.heroTitle,
           heroDescription: subcategoryCategory.heroDescription,
+              heroStats: subcategoryCategory.heroStats,
           categoryType: subcategoryCategory.categoryType,
           itemsCount: transformedServices.length, // Number of services in this subcategory
         },
@@ -1034,6 +1036,7 @@ export const getServiceBySubcategorySlug = async (
         iconName: subcategoryCategory.iconName || '',
         heroTitle: subcategoryCategory.heroTitle || '',
         heroDescription: subcategoryCategory.heroDescription || '',
+        heroStats: subcategoryCategory.heroStats || [],
         categoryType: subcategoryCategory.categoryType,
         itemsCount: subcategoryItemsCount,
       };
@@ -1182,6 +1185,7 @@ export const getServiceBySlug = async (req: Request, res: Response, next: NextFu
               iconName: subcategoryCategory.iconName,
               heroTitle: subcategoryCategory.heroTitle,
               heroDescription: subcategoryCategory.heroDescription,
+              heroStats: subcategoryCategory.heroStats,
               categoryType: subcategoryCategory.categoryType,
               hasSubcategories,
               itemsCount: hasSubcategories ? (subcategoryCategory.subServices as any[]).length : subcategoryItemsCount,
@@ -1410,6 +1414,7 @@ export const getServiceBySlug = async (req: Request, res: Response, next: NextFu
             iconName: subcategoryCategory.iconName,
             heroTitle: subcategoryCategory.heroTitle,
             heroDescription: subcategoryCategory.heroDescription,
+              heroStats: subcategoryCategory.heroStats,
             categoryType: subcategoryCategory.categoryType,
             createdAt: subcategoryCategory.createdAt,
             updatedAt: subcategoryCategory.updatedAt,

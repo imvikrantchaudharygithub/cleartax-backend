@@ -13,6 +13,22 @@ const faqSchema = z.object({
   answer: z.string().min(1, 'Answer is required'),
 });
 
+const whyChooseItemSchema = z.object({
+  title: z.string().min(1, 'Why choose item title is required'),
+  description: z.string().min(1, 'Why choose item description is required'),
+  iconName: z.string().min(1, 'Why choose item icon is required'),
+});
+
+const whyChooseSectionSchema = z.object({
+  heading: z.string().min(1, 'Why choose heading is required'),
+  items: z.array(whyChooseItemSchema).length(3, 'Why choose section must have exactly 3 items'),
+});
+
+const heroStatItemSchema = z.object({
+  label: z.string().min(1, 'Hero stat label is required'),
+  iconName: z.string().min(1, 'Hero stat icon is required'),
+});
+
 export const createServiceSchema = z.object({
   body: z.object({
     title: z.string().min(1, 'Title is required').max(200, 'Title too long'),
@@ -70,6 +86,8 @@ export const createServiceCategorySchema = z.object({
     iconName: z.string().min(1, 'Icon name is required'),
     heroTitle: z.string().min(1, 'Hero title is required'),
     heroDescription: z.string().min(1, 'Hero description is required'),
+    whyChooseSection: whyChooseSectionSchema.optional(),
+    heroStats: z.array(heroStatItemSchema).length(4, 'Hero stats must have exactly 4 items').optional(),
     categoryType: z.enum(['simple', 'banking-finance', 'ipo', 'legal']),
     subServices: z.array(z.string()).optional(),
   }),

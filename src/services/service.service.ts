@@ -36,6 +36,13 @@ const ensureUniqueSlug = async (baseSlug: string, excludeId?: string): Promise<s
   }
 };
 
+/** Exact string match ignoring case (e.g. Service.category "GST" vs category slug "gst"). */
+const caseInsensitiveExact = (field: string, value: string | undefined | null): Record<string, unknown> | null => {
+  if (value == null || value === '') return null;
+  const escaped = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return { [field]: { $regex: new RegExp(`^${escaped}$`, 'i') } };
+};
+
 export const createService = async (data: ServiceCreateRequest): Promise<ServiceResponse> => {
   const slug = data.slug || generateSlug(data.title);
 
@@ -489,6 +496,8 @@ export const getServices = async (query: ServiceQueryParams) => {
       iconName: cat.iconName,
       heroTitle: cat.heroTitle,
       heroDescription: cat.heroDescription,
+      whyChooseSection: cat.whyChooseSection,
+      heroStats: cat.heroStats,
       categoryType: cat.categoryType,
     };
 
@@ -745,6 +754,8 @@ export const getServiceBySlug = async (
         iconName: categoryDoc.iconName,
         heroTitle: categoryDoc.heroTitle,
         heroDescription: categoryDoc.heroDescription,
+        whyChooseSection: categoryDoc.whyChooseSection,
+        heroStats: categoryDoc.heroStats,
         categoryType: categoryDoc.categoryType,
       };
 
@@ -816,6 +827,8 @@ export const getServicesByCategory = async (
   subcategories?: (ServiceResponse & { itemsCount?: number })[];
 }> => {
   const serviceBaseFilter = includeDrafts ? {} : { $or: [{ status: 'published' }, { status: { $exists: false } }, { status: null }] };
+  const applyStatusFilter = (query: Record<string, any>) =>
+    includeDrafts ? query : { $and: [serviceBaseFilter, query] };
   // First try to find by slug or id (specific category)
   let categoryDoc = await ServiceCategory.findOne({
     $or: [
@@ -863,13 +876,14 @@ export const getServicesByCategory = async (
 
   if (!categoryDoc) {
     // Fallback: try to find services by category string directly
-    const services = await Service.find({ 
-      ...(includeDrafts ? {} : { status: 'published' }),
-      $or: [
-        { category: category },
-        { categoryName: { $regex: category, $options: 'i' } },
-      ]
-    }).sort({ createdAt: -1 }).lean();
+    const services = await Service.find(
+      applyStatusFilter({
+        $or: [
+          { category: category },
+          { categoryName: { $regex: category, $options: 'i' } },
+        ],
+      })
+    ).sort({ createdAt: -1 }).lean();
     return {
       services: services as unknown as ServiceResponse[],
       category: null,
@@ -881,9 +895,15 @@ export const getServicesByCategory = async (
   const categoryId = categoryDoc._id;
   const categoryIdString = categoryId ? categoryId.toString() : `virtual-${category.toLowerCase()}`;
 
-  // Check if category has subServices (subcategories)
-  let hasSubcategories = categoryDoc.subServices && Array.isArray(categoryDoc.subServices) && categoryDoc.subServices.length > 0;
-  
+  // subServices refs point at Service documents (featured / ordered links), not child ServiceCategory rows.
+  // Only virtual parents (categoryType query, no concrete _id) use hasSubcategories + subcategories list.
+  // For a real ServiceCategory document, never treat subServices as navigable "subcategories" in the API.
+  const isConcreteCategory = Boolean(categoryId);
+  let hasSubcategories =
+    !isConcreteCategory &&
+    Array.isArray(categoryDoc.subServices) &&
+    categoryDoc.subServices.length > 0;
+
   // Find services in this category - handle both ObjectId and string formats
   // Also match by categoryName for backward compatibility
   // If category has subcategories, we still want to check for direct services
@@ -894,6 +914,14 @@ export const getServicesByCategory = async (
     { category: categoryDoc.slug }, // Match by slug (unique per category)
     { category: categoryDoc.id }, // Match by category id (e.g. "gst", "registration") — services often store id not slug
   ];
+  const ciCategorySlug = caseInsensitiveExact('category', categoryDoc.slug);
+  const ciCategoryId = caseInsensitiveExact('category', categoryDoc.id);
+  const ciSubSlug = caseInsensitiveExact('subcategory', categoryDoc.slug);
+  const ciSubId = caseInsensitiveExact('subcategory', categoryDoc.id);
+  if (ciCategorySlug) queryConditions.push(ciCategorySlug);
+  if (ciCategoryId) queryConditions.push(ciCategoryId);
+  if (ciSubSlug) queryConditions.push(ciSubSlug);
+  if (ciSubId) queryConditions.push(ciSubId);
   
   // Only add ObjectId-based queries if categoryId is not null (not a virtual parent)
   if (categoryId) {
@@ -919,10 +947,9 @@ export const getServicesByCategory = async (
     );
   }
   
-  let services = await Service.find({
-    ...serviceBaseFilter,
+  let services = await Service.find(applyStatusFilter({
     $or: queryConditions,
-  })
+  }))
     .populate('relatedServices', '_id slug title shortDescription')
     .sort({ createdAt: -1 })
     .lean();
@@ -934,6 +961,10 @@ export const getServicesByCategory = async (
       { subcategory: categoryDoc.id },
       { category: categoryDoc.id },
     ];
+    if (ciCategorySlug) fallbackConditions.push(ciCategorySlug);
+    if (ciCategoryId) fallbackConditions.push(ciCategoryId);
+    if (ciSubSlug) fallbackConditions.push(ciSubSlug);
+    if (ciSubId) fallbackConditions.push(ciSubId);
     if (categoryDoc.categoryType) {
       const ct = categoryDoc.categoryType;
       fallbackConditions.push(
@@ -943,10 +974,9 @@ export const getServicesByCategory = async (
         { category: ct, subcategory: categoryDoc.id }
       );
     }
-    const fallbackServices = await Service.find({
-      ...serviceBaseFilter,
+    const fallbackServices = await Service.find(applyStatusFilter({
       $or: fallbackConditions,
-    })
+    }))
       .populate('relatedServices', '_id slug title shortDescription')
       .sort({ createdAt: -1 })
       .lean();
@@ -962,8 +992,7 @@ export const getServicesByCategory = async (
     const slugPattern = categoryDoc.slug.replace(/-/g, '[-_]?');
     const titlePattern = categoryDoc.title ? categoryDoc.title.split(' ').join('|') : '';
     
-    const fallbackServices = await Service.find({
-      ...serviceBaseFilter,
+    const fallbackServices = await Service.find(applyStatusFilter({
       $and: [
         { category: ct },
         { $or: [{ subcategory: { $exists: false } }, { subcategory: null }, { subcategory: '' }] },
@@ -975,7 +1004,7 @@ export const getServicesByCategory = async (
           ],
         },
       ],
-    })
+    }))
       .populate('relatedServices', '_id slug title shortDescription')
       .sort({ createdAt: -1 })
       .lean();
@@ -1040,6 +1069,8 @@ export const getServicesByCategory = async (
     iconName: categoryDoc.iconName,
     heroTitle: categoryDoc.heroTitle,
     heroDescription: categoryDoc.heroDescription,
+    whyChooseSection: categoryDoc.whyChooseSection,
+    heroStats: categoryDoc.heroStats,
     categoryType: categoryDoc.categoryType,
   };
 
@@ -1061,8 +1092,7 @@ export const getServicesByCategory = async (
       let itemsCount = 0;
       if (cat.categoryType && cat.slug) {
         // Step 1: Count services explicitly linked by subcategory ID
-        const byIdQuery = {
-          ...serviceBaseFilter,
+        const byIdQuery = applyStatusFilter({
           $or: [
             { category: cat._id },
             { category: categoryId },
@@ -1073,7 +1103,7 @@ export const getServicesByCategory = async (
             { $expr: { $eq: [{ $toString: '$category' }, categoryId] } },
             { $expr: { $eq: [{ $toString: '$subcategory' }, categoryId] } },
           ],
-        };
+        });
         const byIdCount = await Service.countDocuments(byIdQuery);
         
         // Step 2: Count services with slug/title pattern matching (but NOT already linked)
@@ -1099,8 +1129,7 @@ export const getServicesByCategory = async (
         
         // Final fallback: Use controller's comprehensive query (all conditions from service.controller.ts lines 69-111)
         if (itemsCount === 0) {
-          const comprehensiveQuery = {
-            ...serviceBaseFilter,
+          const comprehensiveQuery = applyStatusFilter({
             $or: [
               // Match by ID variations
               { category: categoryId },
@@ -1115,13 +1144,12 @@ export const getServicesByCategory = async (
               // Match by title regex
               { categoryName: { $regex: cat.title, $options: 'i' } },
             ],
-          };
+          });
           itemsCount = await Service.countDocuments(comprehensiveQuery);
         }
       } else {
         // For regular subcategories without categoryType, use the standard query
-        const countQuery = {
-          ...serviceBaseFilter,
+        const countQuery = applyStatusFilter({
           $or: [
             { category: cat._id },
             { category: categoryId },
@@ -1135,7 +1163,7 @@ export const getServicesByCategory = async (
             { $expr: { $eq: [{ $toString: '$subcategory' }, categoryId] } },
             { $expr: { $eq: [{ $toString: '$category' }, categoryId] } },
           ],
-        };
+        });
         itemsCount = await Service.countDocuments(countQuery);
       }
       

@@ -8,6 +8,18 @@ export interface IServiceCategory extends Document {
   iconName: string;
   heroTitle: string;
   heroDescription: string;
+  whyChooseSection?: {
+    heading: string;
+    items: Array<{
+      title: string;
+      description: string;
+      iconName: string;
+    }>;
+  };
+  heroStats?: Array<{
+    label: string;
+    iconName: string;
+  }>;
   categoryType: 'simple' | 'banking-finance' | 'ipo' | 'legal';
   subServices: mongoose.Types.ObjectId[];
   createdAt: Date;
@@ -53,6 +65,46 @@ const ServiceCategorySchema = new Schema<IServiceCategory>(
       type: String,
       required: [true, 'Hero description is required'],
       trim: true,
+    },
+    whyChooseSection: {
+      heading: {
+        type: String,
+        trim: true,
+      },
+      items: {
+        type: [
+          {
+            title: {
+              type: String,
+              trim: true,
+            },
+            description: {
+              type: String,
+              trim: true,
+            },
+            iconName: {
+              type: String,
+              trim: true,
+            },
+          },
+        ],
+        default: undefined,
+      },
+    },
+    heroStats: {
+      type: [
+        {
+          label: {
+            type: String,
+            trim: true,
+          },
+          iconName: {
+            type: String,
+            trim: true,
+          },
+        },
+      ],
+      default: undefined,
     },
     categoryType: {
       type: String,
