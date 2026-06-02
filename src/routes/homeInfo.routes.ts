@@ -1,21 +1,14 @@
 import { Router } from 'express';
 import { getHomeInfoController, updateHomeInfoController } from '../controllers/homeInfo.controller';
-// import { authenticate as protect, authorize } from '../middlewares/auth.middleware';
+import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { uploadImage } from '../middlewares/upload.middleware';
-// import { USER_ROLES } from '../config/constants';
 
 const router = Router();
 
-// Public routes
+// Public route
 router.get('/', getHomeInfoController);
 
-// Protected routes (Admin only)
-router.put(
-  '/',
-  // protect,
-  // authorize(USER_ROLES.ADMIN),
-  uploadImage.any(),
-  updateHomeInfoController
-);
+// Protected route — admin only
+router.put('/', authenticate, authorize('admin'), uploadImage.any(), updateHomeInfoController);
 
 export default router;

@@ -9,6 +9,14 @@ export interface UserResponse {
   updatedAt: Date;
 }
 
+export interface UserCreateRequest {
+  fullName: string;
+  email: string;
+  phone: string;
+  password: string;
+  role?: 'admin' | 'user';
+}
+
 export interface UserUpdateRequest {
   fullName?: string;
   phone?: string;

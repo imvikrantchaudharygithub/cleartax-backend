@@ -6,6 +6,7 @@ import {
   updateTeamMemberSchema,
 } from '../validations/team.validations';
 import { singleFileUpload } from '../middlewares/upload.middleware';
+import { authenticate, authorize } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -13,13 +14,9 @@ const router = Router();
 router.get('/', teamController.getTeamMembers);
 router.get('/:id', teamController.getTeamMemberById);
 
-// Protected routes (admin only) - AUTH TEMPORARILY DISABLED
-// router.post('/', authenticate, authorize('admin'), singleFileUpload, validate(createTeamMemberSchema), teamController.createTeamMember);
-// router.put('/:id', authenticate, authorize('admin'), singleFileUpload, validate(updateTeamMemberSchema), teamController.updateTeamMember);
-// router.delete('/:id', authenticate, authorize('admin'), teamController.deleteTeamMember);
-router.post('/', singleFileUpload, validate(createTeamMemberSchema), teamController.createTeamMember);
-router.put('/:id', singleFileUpload, validate(updateTeamMemberSchema), teamController.updateTeamMember);
-router.delete('/:id', teamController.deleteTeamMember);
+// Protected routes — admin only
+router.post('/', authenticate, authorize('admin'), singleFileUpload, validate(createTeamMemberSchema), teamController.createTeamMember);
+router.put('/:id', authenticate, authorize('admin'), singleFileUpload, validate(updateTeamMemberSchema), teamController.updateTeamMember);
+router.delete('/:id', authenticate, authorize('admin'), teamController.deleteTeamMember);
 
 export default router;
-

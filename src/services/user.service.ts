@@ -1,6 +1,46 @@
+import bcrypt from 'bcryptjs';
 import { User } from '../models/User.model';
-import { UserUpdateRequest, UserRoleUpdateRequest, UserQueryParams, UserResponse } from '../types/user.types';
+import {
+  UserCreateRequest,
+  UserUpdateRequest,
+  UserRoleUpdateRequest,
+  UserQueryParams,
+  UserResponse,
+} from '../types/user.types';
 import { PAGINATION } from '../config/constants';
+import { AppError } from '../middlewares/error.middleware';
+
+export const createUser = async (data: UserCreateRequest): Promise<UserResponse> => {
+  // Reject duplicate email or phone with a clear message (model also enforces uniqueness)
+  const existing = await User.findOne({
+    $or: [{ email: data.email }, { phone: data.phone }],
+  });
+
+  if (existing) {
+    const conflict: AppError = new Error(
+      existing.email === data.email.toLowerCase()
+        ? 'Email already registered'
+        : 'Phone number already registered'
+    );
+    conflict.statusCode = 409;
+    throw conflict;
+  }
+
+  const hashedPassword = await bcrypt.hash(data.password, 10);
+
+  const user = await User.create({
+    fullName: data.fullName,
+    email: data.email,
+    phone: data.phone,
+    password: hashedPassword,
+    role: data.role || 'admin',
+    isActive: true,
+  });
+
+  // Never return the password hash
+  const { password, ...safe } = user.toObject();
+  return safe as unknown as UserResponse;
+};
 
 export const getUsers = async (query: UserQueryParams) => {
   const page = query.page || PAGINATION.DEFAULT_PAGE;

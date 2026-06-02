@@ -8,6 +8,7 @@ import {
   blogQuerySchema,
 } from '../validations/blog.validations';
 import { singleImageUpload } from '../middlewares/upload.middleware';
+import { authenticate, authorize } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -18,13 +19,9 @@ router.get('/recent', blogController.getRecentBlogs);
 router.get('/:slug', validate(getBlogBySlugSchema), blogController.getBlogBySlug);
 router.get('/:slug/related', validate(getBlogBySlugSchema), blogController.getRelatedBlogs);
 
-// Protected routes (admin only) - AUTH TEMPORARILY DISABLED
-// router.post('/', authenticate, authorize('admin'), singleImageUpload, validate(createBlogSchema), blogController.createBlog);
-// router.put('/:id', authenticate, authorize('admin'), singleImageUpload, validate(updateBlogSchema), blogController.updateBlog);
-// router.delete('/:id', authenticate, authorize('admin'), blogController.deleteBlog);
-router.post('/', singleImageUpload, validate(createBlogSchema), blogController.createBlog);
-router.put('/:id', singleImageUpload, validate(updateBlogSchema), blogController.updateBlog);
-router.delete('/:id', blogController.deleteBlog);
+// Protected routes — admin only
+router.post('/', authenticate, authorize('admin'), singleImageUpload, validate(createBlogSchema), blogController.createBlog);
+router.put('/:id', authenticate, authorize('admin'), singleImageUpload, validate(updateBlogSchema), blogController.updateBlog);
+router.delete('/:id', authenticate, authorize('admin'), blogController.deleteBlog);
 
 export default router;
-

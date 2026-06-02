@@ -1,6 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
 import * as userService from '../services/user.service';
 
+export const createUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const user = await userService.createUser(req.body);
+    res.status(201).json({
+      success: true,
+      data: user,
+      message: 'User created successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getUsers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const result = await userService.getUsers(req.query as any);

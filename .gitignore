@@ -37,3 +37,43 @@ coverage/
 tmp/
 temp/
 
+# Env (catch-all, in addition to the explicit names above)
+.env*
+!.env.example
+
+# Vercel / deploy
+.vercel
+
+# TypeScript build info
+*.tsbuildinfo
+
+# AI coding-assistant scratch dirs (not needed for deployment)
+.agent/
+.agents/
+.claude/
+.cline/
+.codebuddy/
+.commandcode/
+.continue/
+.crush/
+.cursor/
+.factory/
+.goose/
+.junie/
+.kilocode/
+.kiro/
+.kode/
+.mcpjam/
+.mux/
+.neovate/
+.openhands/
+.pi/
+.pochi/
+.qoder/
+.qwen/
+.roo/
+.trae/
+.windsurf/
+.zencoder/
+skills/
+

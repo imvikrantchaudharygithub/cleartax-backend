@@ -14,6 +14,7 @@ import {
   updateServiceDraftSchema,
   publishServiceDraftSchema,
 } from '../validations/service.validations';
+import { authenticate, authorize } from '../middlewares/auth.middleware';
 
 const router = Router();
 
@@ -21,36 +22,35 @@ const router = Router();
 router.get('/', validate(serviceQuerySchema), serviceController.getServices);
 router.get('/categories', serviceController.getServiceCategories);
 router.get('/categories/:id', serviceController.getServiceCategoryById);
-router.post('/draft', validate(createServiceDraftSchema), serviceController.createServiceDraft);
-router.put('/draft/:id', validate(updateServiceDraftSchema), serviceController.updateServiceDraft);
 router.get('/draft/:id', serviceController.getServiceDraftById);
 router.get('/drafts', serviceController.getServiceDrafts);
-router.delete('/draft/:id', serviceController.deleteServiceDraft);
-router.post('/publish/:id', validate(publishServiceDraftSchema), serviceController.publishServiceDraft);
-// Category CRUD routes must come before generic /:category route to avoid conflicts
-router.put('/categories/:id', validate(updateServiceCategorySchema), serviceController.updateServiceCategory);
-router.delete('/categories/:id', serviceController.deleteServiceCategory);
 router.get('/:category', serviceController.getServicesByCategory);
-router.get('/:category/:subcategory', serviceController.getServicesBySubcategory); // Get all items/services of a subcategory
-// Service CRUD by category/subcategory routes - PUT/DELETE must come before GET routes with same pattern
-router.put('/:category/:subcategory/:slug', validate(updateServiceBySubcategorySchema), serviceController.updateServiceBySubcategory); // Update subcategory item
-router.delete('/:category/:subcategory/:slug', serviceController.deleteServiceBySubcategory); // Delete subcategory item
-router.get('/:category/:subcategory/:slug', serviceController.getServiceBySubcategorySlug); // Subcategory item details
-router.put('/:category/:slug', validate(updateServiceByCategorySchema), serviceController.updateServiceByCategory); // Update category item
-router.delete('/:category/:slug', serviceController.deleteServiceByCategory); // Delete category item
-router.get('/:category/:slug', serviceController.getServiceBySlug); // Category item details
+router.get('/:category/:subcategory', serviceController.getServicesBySubcategory);
+router.get('/:category/:subcategory/:slug', serviceController.getServiceBySubcategorySlug);
+router.get('/:category/:slug', serviceController.getServiceBySlug);
 
-// Protected POST/PUT/DELETE routes (admin only) - AUTH TEMPORARILY DISABLED
-// router.post('/', authenticate, authorize('admin'), validate(createServiceSchema), serviceController.createService);
-// router.post('/categories', authenticate, authorize('admin'), validate(createServiceCategorySchema), serviceController.createServiceCategory);
-// router.post('/:category/:subcategory/:slug', authenticate, authorize('admin'), validate(createServiceBySubcategorySchema), serviceController.createServiceBySubcategory);
-// router.put('/:id', authenticate, authorize('admin'), validate(updateServiceSchema), serviceController.updateService);
-// router.delete('/:id', authenticate, authorize('admin'), serviceController.deleteService);
-router.post('/', validate(createServiceSchema), serviceController.createService);
-router.post('/categories', validate(createServiceCategorySchema), serviceController.createServiceCategory);
-router.post('/:category/:subcategory/:slug', validate(createServiceBySubcategorySchema), serviceController.createServiceBySubcategory); // Create service with category and subcategory
-router.put('/:id', validate(updateServiceSchema), serviceController.updateService);
-router.delete('/:id', serviceController.deleteService);
+// Protected routes — admin only
+// Draft management
+router.post('/draft', authenticate, authorize('admin'), validate(createServiceDraftSchema), serviceController.createServiceDraft);
+router.put('/draft/:id', authenticate, authorize('admin'), validate(updateServiceDraftSchema), serviceController.updateServiceDraft);
+router.delete('/draft/:id', authenticate, authorize('admin'), serviceController.deleteServiceDraft);
+router.post('/publish/:id', authenticate, authorize('admin'), validate(publishServiceDraftSchema), serviceController.publishServiceDraft);
+
+// Category CRUD — must come before generic /:category routes
+router.post('/categories', authenticate, authorize('admin'), validate(createServiceCategorySchema), serviceController.createServiceCategory);
+router.put('/categories/:id', authenticate, authorize('admin'), validate(updateServiceCategorySchema), serviceController.updateServiceCategory);
+router.delete('/categories/:id', authenticate, authorize('admin'), serviceController.deleteServiceCategory);
+
+// Service CRUD
+router.post('/', authenticate, authorize('admin'), validate(createServiceSchema), serviceController.createService);
+router.put('/:id', authenticate, authorize('admin'), validate(updateServiceSchema), serviceController.updateService);
+router.delete('/:id', authenticate, authorize('admin'), serviceController.deleteService);
+
+// Service CRUD by category/subcategory
+router.post('/:category/:subcategory/:slug', authenticate, authorize('admin'), validate(createServiceBySubcategorySchema), serviceController.createServiceBySubcategory);
+router.put('/:category/:subcategory/:slug', authenticate, authorize('admin'), validate(updateServiceBySubcategorySchema), serviceController.updateServiceBySubcategory);
+router.delete('/:category/:subcategory/:slug', authenticate, authorize('admin'), serviceController.deleteServiceBySubcategory);
+router.put('/:category/:slug', authenticate, authorize('admin'), validate(updateServiceByCategorySchema), serviceController.updateServiceByCategory);
+router.delete('/:category/:slug', authenticate, authorize('admin'), serviceController.deleteServiceByCategory);
 
 export default router;
-
