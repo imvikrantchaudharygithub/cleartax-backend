@@ -24,6 +24,8 @@ app.use(helmet());
 const allowedOrigins = [
   'http://localhost:3000',
   'https://cleartax-frontend.vercel.app',
+  'https://finvidhi.com',
+  'https://www.finvidhi.com',
   process.env.FRONTEND_URL,
 ].filter(Boolean); // Remove any undefined values
 
