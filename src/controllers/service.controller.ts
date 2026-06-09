@@ -241,6 +241,7 @@ export const getServicesBySubcategory = async (
             ),
             createdAt: service.createdAt,
             updatedAt: service.updatedAt,
+            status: service.status,
             category: parentCategory ? parentCategory._id.toString() : categoryIdString,
             categoryInfo: parentCategory ? {
               _id: parentCategory._id.toString(),
@@ -342,6 +343,7 @@ export const getServicesBySubcategory = async (
                 ),
                 createdAt: service.createdAt,
                 updatedAt: service.updatedAt,
+                status: service.status,
                 category: cat._id.toString(),
                 categoryInfo: {
                   _id: cat._id.toString(),
@@ -603,6 +605,7 @@ export const getServicesBySubcategory = async (
         ),
         createdAt: service.createdAt,
         updatedAt: service.updatedAt,
+        status: service.status,
         category: categoryDoc._id.toString(),
         categoryInfo: {
           _id: categoryDoc._id.toString(),
@@ -703,6 +706,7 @@ export const getServicesBySubcategory = async (
         ),
         createdAt: service.createdAt,
         updatedAt: service.updatedAt,
+        status: service.status,
         category: categoryDoc._id.toString(),
         categoryInfo: {
           _id: categoryDoc._id.toString(),
@@ -1159,6 +1163,7 @@ export const getServiceBySlug = async (req: Request, res: Response, next: NextFu
             ),
             createdAt: service.createdAt,
             updatedAt: service.updatedAt,
+            status: service.status,
             category: subcategoryCategory._id.toString(),
             categoryInfo: {
               _id: subcategoryCategory._id.toString(),
@@ -1387,6 +1392,7 @@ export const getServiceBySlug = async (req: Request, res: Response, next: NextFu
           ),
           createdAt: service.createdAt,
           updatedAt: service.updatedAt,
+          status: service.status,
           category: subcategoryCategory._id.toString(),
           categoryInfo: {
             _id: subcategoryCategory._id.toString(),
@@ -1905,6 +1911,20 @@ export const updateService = async (req: Request, res: Response, next: NextFunct
       success: true,
       data: service,
       message: 'Service updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const unpublishService = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const service = await serviceService.unpublishService(id);
+    res.status(200).json({
+      success: true,
+      data: service,
+      message: 'Service unpublished successfully',
     });
   } catch (error) {
     next(error);

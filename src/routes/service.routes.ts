@@ -35,6 +35,7 @@ router.post('/draft', authenticate, authorize('admin'), validate(createServiceDr
 router.put('/draft/:id', authenticate, authorize('admin'), validate(updateServiceDraftSchema), serviceController.updateServiceDraft);
 router.delete('/draft/:id', authenticate, authorize('admin'), serviceController.deleteServiceDraft);
 router.post('/publish/:id', authenticate, authorize('admin'), validate(publishServiceDraftSchema), serviceController.publishServiceDraft);
+router.post('/unpublish/:id', authenticate, authorize('admin'), serviceController.unpublishService);
 
 // Category CRUD — must come before generic /:category routes
 router.post('/categories', authenticate, authorize('admin'), validate(createServiceCategorySchema), serviceController.createServiceCategory);

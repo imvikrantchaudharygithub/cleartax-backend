@@ -530,6 +530,7 @@ export const getServices = async (query: ServiceQueryParams) => {
       ),
       createdAt: service.createdAt,
       updatedAt: service.updatedAt,
+      status: service.status,
     };
 
     // Handle category - check if it's ObjectId or string
@@ -794,6 +795,7 @@ export const getServiceBySlug = async (
     ),
     createdAt: service.createdAt,
     updatedAt: service.updatedAt,
+    status: service.status,
   };
 
   // Add category information
@@ -1034,6 +1036,7 @@ export const getServicesByCategory = async (
       ),
       createdAt: service.createdAt,
       updatedAt: service.updatedAt,
+      status: service.status,
       category: categoryIdString || category.toLowerCase(),
       categoryInfo: {
         _id: categoryIdString,
@@ -1285,6 +1288,17 @@ export const updateService = async (id: string, data: ServiceUpdateRequest): Pro
     throw new Error('Service not found');
   }
 
+  // Read the RAW persisted status before Mongoose hydration masks it.
+  // Legacy services have no `status` field; the schema default ('draft') is
+  // applied in memory on hydration, and a plain save() would persist that
+  // default — silently hiding the service from the published-only public
+  // listing. Capture the real stored value so we can preserve visibility.
+  const rawDoc = await Service.collection.findOne(
+    { _id: service._id },
+    { projection: { status: 1 } }
+  );
+  const persistedStatus = (rawDoc as any)?.status as 'draft' | 'published' | undefined;
+
   // Generate new slug if title changed
   if (data.title && data.title !== service.title) {
     const newSlug = generateSlug(data.title);
@@ -1300,9 +1314,34 @@ export const updateService = async (id: string, data: ServiceUpdateRequest): Pro
   }
 
   Object.assign(service, data);
+
+  // Editing a service must never change its visibility. When the caller does
+  // not explicitly set a status, restore the persisted intent: a real draft
+  // stays a draft; anything else (published, or legacy with no status) stays
+  // published so it remains visible on the public site.
+  if (data.status === undefined) {
+    service.status = persistedStatus === 'draft' ? 'draft' : 'published';
+  }
+
   await service.save();
 
   return service.toObject() as unknown as ServiceResponse;
+};
+
+export const unpublishService = async (id: string): Promise<ServiceResponse> => {
+  const service = await Service.findById(id);
+
+  if (!service) {
+    throw new Error('Service not found');
+  }
+
+  // Use a direct status write so we don't trip the published-only required-field
+  // validators on save() (a published service is guaranteed valid; flipping it to
+  // draft must always succeed). This pulls it off the public, published-only listing.
+  await Service.updateOne({ _id: service._id }, { $set: { status: 'draft' } });
+
+  const updated = await Service.findById(id).lean();
+  return updated as unknown as ServiceResponse;
 };
 
 export const deleteService = async (id: string): Promise<void> => {
