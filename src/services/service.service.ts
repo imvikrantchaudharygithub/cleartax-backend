@@ -538,15 +538,16 @@ export const getServices = async (query: ServiceQueryParams) => {
     
     if (service.category) {
       const categoryValue = service.category;
-      
-      // Check if it's an ObjectId
-      if (mongoose.Types.ObjectId.isValid(categoryValue) && typeof categoryValue !== 'string') {
-        categoryInfo = categoryById.get(categoryValue.toString());
+      const categoryRaw = categoryValue.toString();
+
+      // Resolve by _id first — handles both real ObjectId and ObjectId stored as a string
+      if (mongoose.Types.ObjectId.isValid(categoryRaw) && categoryById.has(categoryRaw)) {
+        categoryInfo = categoryById.get(categoryRaw);
       } else {
         // It's a string - try to find by slug, id, or categoryType
-        const categoryStr = categoryValue.toString().toLowerCase();
-        categoryInfo = categoryBySlug.get(categoryStr) || 
-                      categoryByIdString.get(categoryStr) || 
+        const categoryStr = categoryRaw.toLowerCase();
+        categoryInfo = categoryBySlug.get(categoryStr) ||
+                      categoryByIdString.get(categoryStr) ||
                       categoryByType.get(categoryStr);
       }
       
@@ -613,13 +614,14 @@ export const getServices = async (query: ServiceQueryParams) => {
     // Handle subcategory similarly
     if (service.subcategory) {
       const subcategoryValue = service.subcategory;
+      const subcategoryRaw = subcategoryValue.toString();
       let subcategoryInfo = null;
-      
-      if (mongoose.Types.ObjectId.isValid(subcategoryValue) && typeof subcategoryValue !== 'string') {
-        subcategoryInfo = categoryById.get(subcategoryValue.toString());
+
+      if (mongoose.Types.ObjectId.isValid(subcategoryRaw) && categoryById.has(subcategoryRaw)) {
+        subcategoryInfo = categoryById.get(subcategoryRaw);
       } else {
-        const subcategoryStr = subcategoryValue.toString().toLowerCase();
-        subcategoryInfo = categoryBySlug.get(subcategoryStr) || 
+        const subcategoryStr = subcategoryRaw.toLowerCase();
+        subcategoryInfo = categoryBySlug.get(subcategoryStr) ||
                          categoryByIdString.get(subcategoryStr);
       }
       
@@ -1434,18 +1436,14 @@ export const updateServiceCategory = async (
     throw new Error('Service category not found');
   }
 
-  // Generate new slug if title changed
-  if (data.title && data.title !== category.title) {
-    const newSlug = generateSlug(data.title);
-    const existingCategory = await ServiceCategory.findOne({
-      slug: newSlug,
-      _id: { $ne: category._id },
-    });
-    if (existingCategory) {
-      throw new Error('A service category with this title already exists');
-    }
-    (data as any).slug = newSlug;
-  }
+  // Routing keys are immutable on update. The public site resolves categories by
+  // `id`/`slug`/`categoryType` (e.g. /services/gst), so silently changing them when
+  // an admin edits content (like the display title) would break URLs and the
+  // service<->category links. Never let an update mutate these — editing the title
+  // changes only the displayed title, not the slug.
+  delete (data as any).id;
+  delete (data as any).slug;
+  delete (data as any).categoryType;
 
   // Handle subServices array update
   if (data.subServices !== undefined) {

@@ -411,13 +411,13 @@ export const getServicesBySubcategory = async (
     }
     
     if (!categoryDoc) {
-      res.status(404).json({
-        success: false,
-        message: 'Category not found',
-      });
-      return;
+      // The first segment isn't a known category slug/id/type (e.g. legacy "gst"
+      // segment). The second segment is uniquely slugged, so treat it as a service
+      // slug and let getServiceBySlug resolve it instead of 404-ing.
+      req.params.slug = subcategory;
+      return getServiceBySlug(req, res, next);
     }
-    
+
     // Check if subcategory is a category (subcategory category) or a service (in subServices)
     const subcategoryCategory = await ServiceCategory.findOne({
       $or: [
@@ -658,7 +658,7 @@ export const getServicesBySubcategory = async (
     
     // Check if category has subcategories - if not, treat this as a service slug request
     const hasSubcategories = categoryDoc.subServices && Array.isArray(categoryDoc.subServices) && categoryDoc.subServices.length > 0;
-    
+
     if (!hasSubcategories) {
       // Category doesn't have subcategories, so treat this as a service slug
       // Redirect to getServiceBySlug handler
@@ -1552,14 +1552,30 @@ export const getServiceBySlug = async (req: Request, res: Response, next: NextFu
     try {
       const service = await serviceService.getServiceBySlug(slug, category);
       
-      // Verify category matches if provided
+      // Verify category matches if provided.
+      // The service is found by its unique slug, so a published service must never
+      // 404 just because its (possibly legacy) category field can't be resolved.
       if (category && categoryDoc) {
         const serviceAny = service as any;
-        const serviceCategoryId = serviceAny.categoryInfo?._id || serviceAny.category?.toString() || '';
+        const serviceCategoryId = (serviceAny.categoryInfo?._id || serviceAny.category?.toString() || '').toString();
         const categoryId = categoryDoc._id.toString();
-        
-        // Check if category matches
-        if (serviceCategoryId.toString() !== categoryId) {
+
+        if (!serviceCategoryId) {
+          // Legacy/unresolvable category on the service — trust the URL category and attach it.
+          serviceAny.category = categoryId;
+          serviceAny.categoryInfo = {
+            _id: categoryId,
+            id: categoryDoc.id,
+            slug: categoryDoc.slug,
+            title: categoryDoc.title,
+            description: categoryDoc.description,
+            iconName: categoryDoc.iconName,
+            heroTitle: categoryDoc.heroTitle,
+            heroDescription: categoryDoc.heroDescription,
+            categoryType: categoryDoc.categoryType,
+          };
+        } else if (serviceCategoryId !== categoryId) {
+          // Service resolves to a genuinely different category than the URL claims.
           res.status(404).json({
             success: false,
             message: 'Service not found in the specified category',
