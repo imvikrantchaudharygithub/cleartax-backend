@@ -51,6 +51,28 @@ export const updateTeamMember = async (
   return member as unknown as TeamMemberResponse;
 };
 
+export const reorderTeamMembers = async (orderedIds: string[]): Promise<TeamMemberResponse[]> => {
+  // Assign displayOrder = position (1-based) to each id, guaranteeing a clean,
+  // gapless, duplicate-free 1..N sequence regardless of the previous values.
+  const operations = orderedIds.map((id, index) => {
+    const filter = isMongoId(id)
+      ? { _id: new mongoose.Types.ObjectId(id) }
+      : { id };
+    return {
+      updateOne: {
+        filter,
+        update: { $set: { displayOrder: index + 1 } },
+      },
+    };
+  });
+
+  if (operations.length > 0) {
+    await Team.bulkWrite(operations);
+  }
+
+  return getTeamMembers();
+};
+
 export const deleteTeamMember = async (id: string): Promise<void> => {
   const filter = isMongoId(id)
     ? { _id: new mongoose.Types.ObjectId(id) }

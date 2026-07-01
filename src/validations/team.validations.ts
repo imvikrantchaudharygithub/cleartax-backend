@@ -14,6 +14,12 @@ export const createTeamMemberSchema = z.object({
   }),
 });
 
+export const reorderTeamSchema = z.object({
+  body: z.object({
+    orderedIds: z.array(z.string().min(1)).min(1, 'orderedIds must be a non-empty array'),
+  }),
+});
+
 export const updateTeamMemberSchema = z.object({
   params: z.object({
     id: z.string().min(1, 'Team member ID is required'),

@@ -74,6 +74,20 @@ export const updateTeamMember = async (req: Request, res: Response, next: NextFu
   }
 };
 
+export const reorderTeamMembers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { orderedIds } = req.body as { orderedIds: string[] };
+    const members = await teamService.reorderTeamMembers(orderedIds);
+    res.status(200).json({
+      success: true,
+      data: members,
+      message: 'Team order updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const deleteTeamMember = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
