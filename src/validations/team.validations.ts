@@ -10,6 +10,7 @@ export const createTeamMemberSchema = z.object({
     avatar: z.string().url('Invalid avatar URL').optional(),
     accent: z.string().optional(),
     focusOn: z.string().optional(),
+    displayOrder: z.coerce.number().min(0, 'Display order cannot be negative').optional(),
   }),
 });
 

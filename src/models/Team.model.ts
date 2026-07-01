@@ -9,6 +9,7 @@ export interface ITeam extends Document {
   avatar?: string;
   accent?: string;
   focusOn?: string;
+  displayOrder: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,6 +58,10 @@ const TeamSchema = new Schema<ITeam>(
     focusOn: {
       type: String,
       trim: true,
+    },
+    displayOrder: {
+      type: Number,
+      default: 0,
     },
   },
   {

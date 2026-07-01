@@ -7,6 +7,7 @@ export interface TeamMemberCreateRequest {
   avatar?: string;
   accent?: string;
   focusOn?: string;
+  displayOrder?: number;
 }
 
 export interface TeamMemberUpdateRequest extends Partial<TeamMemberCreateRequest> {}
@@ -21,6 +22,7 @@ export interface TeamMemberResponse {
   avatar?: string;
   accent?: string;
   focusOn?: string;
+  displayOrder?: number;
   createdAt: Date;
   updatedAt: Date;
 }

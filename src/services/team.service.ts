@@ -9,7 +9,7 @@ import {
 const isMongoId = (s: string) => /^[a-fA-F0-9]{24}$/.test(s);
 
 export const getTeamMembers = async (): Promise<TeamMemberResponse[]> => {
-  const members = await Team.find().sort({ createdAt: -1 }).lean();
+  const members = await Team.find().sort({ displayOrder: 1, createdAt: -1 }).lean();
   return members as unknown as TeamMemberResponse[];
 };
 
