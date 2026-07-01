@@ -142,13 +142,17 @@ let reconnectTimer: NodeJS.Timeout | null = null;
 const scheduleReconnect = () => {
   if (reconnectTimer) return;
   reconnectTimer = setInterval(async () => {
-    if (mongoose.connection.readyState === 1) {
+    // readyState is external mutable state; read it fresh (as a number) after the
+    // await so TypeScript doesn't narrow it away across the async boundary.
+    const isConnected = () => (mongoose.connection.readyState as number) === 1;
+
+    if (isConnected()) {
       clearInterval(reconnectTimer!);
       reconnectTimer = null;
       return;
     }
     await ensureConnected();
-    if (mongoose.connection.readyState === 1) {
+    if (isConnected()) {
       console.log('✅ Database reconnected');
       clearInterval(reconnectTimer!);
       reconnectTimer = null;
