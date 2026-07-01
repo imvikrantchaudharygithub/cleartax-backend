@@ -132,7 +132,13 @@ export const updateHomeInfo = async (data: any, files: Express.Multer.File[]) =>
         const existingServices = homeInfo.services ? homeInfo.toObject().services : {};
         homeInfo.services = { ...existingServices, ...data.services };
     }
-    
+
+    if (data.stats) {
+        // Full replace of the stats section (validation enforces exactly 4 items).
+        homeInfo.stats = data.stats;
+        homeInfo.markModified('stats');
+    }
+
     await homeInfo.save();
   }
 

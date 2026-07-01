@@ -74,6 +74,9 @@ export const updateHomeInfoController = async (
         if (body.services) {
              homeInfoSchema.shape.body.shape.services.parse(body.services);
         }
+        if (body.stats) {
+             homeInfoSchema.shape.body.shape.stats.unwrap().parse(body.stats);
+        }
     } catch (error) {
         if (error instanceof ZodError) {
              res.status(400).json({

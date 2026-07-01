@@ -11,11 +11,45 @@ export interface IBanner {
   description: string;
   button1Text: string;
   button2Text: string;
+  badge?: string;
   checklistItems: string[];
   heroImage?: string;
   heroImageAlt?: string;
   heroImagePublicId?: string;
   heroImages?: IHeroImageItem[];
+}
+
+export type StatIcon =
+  | 'FileText'
+  | 'Users'
+  | 'TrendingUp'
+  | 'FileCheck'
+  | 'Award'
+  | 'Building2'
+  | 'Receipt'
+  | 'Calculator';
+
+export const STAT_ICONS: StatIcon[] = [
+  'FileText',
+  'Users',
+  'TrendingUp',
+  'FileCheck',
+  'Award',
+  'Building2',
+  'Receipt',
+  'Calculator',
+];
+
+export interface IStatItem {
+  value: number;
+  prefix?: string;
+  suffix?: string;
+  label: string;
+  icon: StatIcon;
+}
+
+export interface IStats {
+  items: IStatItem[];
 }
 
 export interface IBenefitItem {
@@ -54,6 +88,7 @@ export interface IHomeInfo extends Document {
   banner: IBanner;
   benefits: IBenefits;
   services: IServices;
+  stats?: IStats;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,6 +100,7 @@ const HomeInfoSchema = new Schema<IHomeInfo>(
       description: { type: String, required: true },
       button1Text: { type: String, required: true },
       button2Text: { type: String, required: true },
+      badge: { type: String },
       checklistItems: {
         type: [String],
         required: true,
@@ -138,6 +174,31 @@ const HomeInfoSchema = new Schema<IHomeInfo>(
       },
       ctaButtonText: { type: String, required: true },
       ctaButtonLink: { type: String, required: true },
+    },
+    stats: {
+      type: {
+        items: {
+          type: [
+            {
+              value: { type: Number, required: true },
+              prefix: { type: String },
+              suffix: { type: String },
+              label: { type: String, required: true },
+              icon: {
+                type: String,
+                required: true,
+                enum: STAT_ICONS,
+              },
+            },
+          ],
+          validate: [
+            (val: IStatItem[]) => val.length === 4,
+            '{PATH} must have exactly 4 items',
+          ],
+        },
+      },
+      required: false,
+      _id: false,
     },
   },
   {
