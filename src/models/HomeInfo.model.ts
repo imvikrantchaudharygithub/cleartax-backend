@@ -6,6 +6,12 @@ export interface IHeroImageItem {
   publicId?: string;
 }
 
+/** Floating stat chip overlaid on the hero image (e.g. "15L+ Returns Filed"). */
+export interface IHeroChip {
+  value: string;
+  label: string;
+}
+
 export interface IBanner {
   heading: string;
   description: string;
@@ -17,6 +23,7 @@ export interface IBanner {
   heroImageAlt?: string;
   heroImagePublicId?: string;
   heroImages?: IHeroImageItem[];
+  heroChips?: IHeroChip[];
 }
 
 export type StatIcon =
@@ -121,6 +128,19 @@ const HomeInfoSchema = new Schema<IHomeInfo>(
           },
         ],
         default: [],
+      },
+      heroChips: {
+        type: [
+          {
+            value: { type: String },
+            label: { type: String },
+          },
+        ],
+        default: undefined,
+        validate: [
+          (val: unknown[]) => !val || val.length <= 2,
+          '{PATH} can have at most 2 chips',
+        ],
       },
     },
     benefits: {

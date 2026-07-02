@@ -16,6 +16,15 @@ const bannerSchema = z.object({
   heroImage: z.string().url('Hero image must be a valid URL').optional().or(z.literal('')),
   heroImageAlt: z.string().max(200).optional(),
   heroImages: z.array(heroImageItemSchema).optional(),
+  heroChips: z
+    .array(
+      z.object({
+        value: z.string().min(1, 'Chip value is required').max(20, 'Chip value must be less than 20 characters'),
+        label: z.string().min(1, 'Chip label is required').max(40, 'Chip label must be less than 40 characters'),
+      })
+    )
+    .max(2, 'At most 2 hero chips are allowed')
+    .optional(),
 });
 
 const benefitItemSchema = z.object({
