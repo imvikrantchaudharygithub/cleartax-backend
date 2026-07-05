@@ -10,6 +10,7 @@ import {
 } from '../types/service.types';
 import { PAGINATION } from '../config/constants';
 import mongoose from 'mongoose';
+import { AppError } from '../middlewares/error.middleware';
 
 const generateSlug = (title: string): string => {
   return title
@@ -18,6 +19,43 @@ const generateSlug = (title: string): string => {
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
+};
+
+/**
+ * Resolve a `subServices` array (which may contain Mongo ObjectId hex strings OR
+ * human slugs/ids like "gst-registration") into Service ObjectIds. Slug/id entries
+ * are looked up against the Service collection; entries that can't be resolved are
+ * skipped rather than throwing (never 500 on a bad slug).
+ */
+const resolveSubServiceIds = async (
+  entries: string[]
+): Promise<mongoose.Types.ObjectId[]> => {
+  const resolved: mongoose.Types.ObjectId[] = [];
+
+  for (const entry of entries) {
+    if (typeof entry !== 'string' || entry.trim() === '') {
+      continue;
+    }
+
+    // Already a valid 24-char ObjectId hex string -> use directly.
+    if (/^[a-fA-F0-9]{24}$/.test(entry)) {
+      resolved.push(new mongoose.Types.ObjectId(entry));
+      continue;
+    }
+
+    // Otherwise treat it as a slug/business id and resolve to the Service _id.
+    const svc = await Service.findOne({
+      $or: [{ slug: entry.toLowerCase() }, { id: entry.toLowerCase() }],
+    })
+      .select('_id')
+      .lean();
+
+    if (svc?._id) {
+      resolved.push(svc._id as mongoose.Types.ObjectId);
+    }
+  }
+
+  return resolved;
 };
 
 const ensureUniqueSlug = async (baseSlug: string, excludeId?: string): Promise<string> => {
@@ -49,7 +87,7 @@ export const createService = async (data: ServiceCreateRequest): Promise<Service
   // Check if slug already exists
   const existingService = await Service.findOne({ slug });
   if (existingService) {
-    throw new Error('A service with this title already exists');
+    throw new AppError('A service with this title already exists', 409);
   }
 
   const serviceData: any = {
@@ -172,11 +210,11 @@ export const updateServiceDraft = async (id: string, data: ServiceUpdateRequest)
   const service = await Service.findById(id);
 
   if (!service) {
-    throw new Error('Service not found');
+    throw new AppError('Service not found', 404);
   }
 
   if (service.status === 'published') {
-    throw new Error('Cannot update a published service via draft endpoint');
+    throw new AppError('Cannot update a published service via draft endpoint', 400);
   }
 
   if (data.title && data.title !== service.title && !data.slug) {
@@ -245,7 +283,7 @@ export const getServiceDraftById = async (id: string): Promise<ServiceResponse> 
     .lean();
 
   if (!service) {
-    throw new Error('Service draft not found');
+    throw new AppError('Service draft not found', 404);
   }
 
   return service as unknown as ServiceResponse;
@@ -292,27 +330,27 @@ export const publishServiceDraft = async (id: string): Promise<ServiceResponse> 
   const service = await Service.findById(id);
 
   if (!service) {
-    throw new Error('Service draft not found');
+    throw new AppError('Service draft not found', 404);
   }
 
   if (service.status !== 'draft') {
-    throw new Error('Service is already published');
+    throw new AppError('Service is already published', 400);
   }
 
   if (!service.title || !service.shortDescription || !service.longDescription || !service.iconName) {
-    throw new Error('Missing required fields to publish the service');
+    throw new AppError('Missing required fields to publish the service', 400);
   }
 
   if (!service.price || service.price.min === undefined || service.price.max === undefined) {
-    throw new Error('Price information is required to publish the service');
+    throw new AppError('Price information is required to publish the service', 400);
   }
 
   if (!service.duration) {
-    throw new Error('Duration is required to publish the service');
+    throw new AppError('Duration is required to publish the service', 400);
   }
 
   if (!service.category && !service.categoryName) {
-    throw new Error('Category is required to publish the service');
+    throw new AppError('Category is required to publish the service', 400);
   }
 
   const newSlug = service.slug || generateSlug(service.title);
@@ -332,7 +370,7 @@ export const deleteServiceDraft = async (id: string): Promise<void> => {
   const service = await Service.findOne({ _id: id, status: 'draft' });
 
   if (!service) {
-    throw new Error('Service draft not found');
+    throw new AppError('Service draft not found', 404);
   }
 
   await Service.deleteOne({ _id: id });
@@ -710,7 +748,7 @@ export const getServiceBySlug = async (
     }
   }
   if (!service) {
-    throw new Error('Service not found');
+    throw new AppError('Service not found', 404);
   }
 
   // Get category information
@@ -1287,7 +1325,7 @@ export const updateService = async (id: string, data: ServiceUpdateRequest): Pro
   const service = await Service.findById(id);
 
   if (!service) {
-    throw new Error('Service not found');
+    throw new AppError('Service not found', 404);
   }
 
   // Read the RAW persisted status before Mongoose hydration masks it.
@@ -1306,7 +1344,7 @@ export const updateService = async (id: string, data: ServiceUpdateRequest): Pro
     const newSlug = generateSlug(data.title);
     const existingService = await Service.findOne({ slug: newSlug, _id: { $ne: id } });
     if (existingService) {
-      throw new Error('A service with this title already exists');
+      throw new AppError('A service with this title already exists', 409);
     }
     data.slug = newSlug;
   }
@@ -1334,7 +1372,7 @@ export const unpublishService = async (id: string): Promise<ServiceResponse> => 
   const service = await Service.findById(id);
 
   if (!service) {
-    throw new Error('Service not found');
+    throw new AppError('Service not found', 404);
   }
 
   // Use a direct status write so we don't trip the published-only required-field
@@ -1350,7 +1388,7 @@ export const deleteService = async (id: string): Promise<void> => {
   const service = await Service.findByIdAndDelete(id);
 
   if (!service) {
-    throw new Error('Service not found');
+    throw new AppError('Service not found', 404);
   }
 };
 
@@ -1366,7 +1404,7 @@ export const createServiceCategory = async (
   });
 
   if (existing) {
-    throw new Error('A service category with this ID or title already exists');
+    throw new AppError('A service category with this ID or title already exists', 409);
   }
 
   const categoryData: any = {
@@ -1375,7 +1413,7 @@ export const createServiceCategory = async (
   };
 
   if (data.subServices && data.subServices.length > 0) {
-    categoryData.subServices = data.subServices.map((id) => new mongoose.Types.ObjectId(id));
+    categoryData.subServices = await resolveSubServiceIds(data.subServices);
   }
 
   const category = await ServiceCategory.create(categoryData);
@@ -1406,7 +1444,7 @@ export const getServiceCategoryById = async (id: string): Promise<ServiceCategor
   }
 
   if (!category) {
-    throw new Error('Service category not found');
+    throw new AppError('Service category not found', 404);
   }
 
   return category as unknown as ServiceCategoryResponse;
@@ -1433,7 +1471,7 @@ export const updateServiceCategory = async (
   }
 
   if (!category) {
-    throw new Error('Service category not found');
+    throw new AppError('Service category not found', 404);
   }
 
   // Routing keys are immutable on update. The public site resolves categories by
@@ -1445,13 +1483,13 @@ export const updateServiceCategory = async (
   delete (data as any).slug;
   delete (data as any).categoryType;
 
-  // Handle subServices array update
+  // Handle subServices array update. Entries may be ObjectId hex strings or slugs;
+  // resolve them so slug strings no longer crash with a BSONError.
   if (data.subServices !== undefined) {
-    if (data.subServices.length > 0) {
-      (data as any).subServices = data.subServices.map((serviceId) => new mongoose.Types.ObjectId(serviceId));
-    } else {
-      (data as any).subServices = [];
-    }
+    (data as any).subServices =
+      data.subServices.length > 0
+        ? await resolveSubServiceIds(data.subServices)
+        : [];
   }
 
   // Update category fields
@@ -1482,7 +1520,7 @@ export const deleteServiceCategory = async (id: string): Promise<void> => {
   }
 
   if (!category) {
-    throw new Error('Service category not found');
+    throw new AppError('Service category not found', 404);
   }
 
   // Check if category has services linked to it
@@ -1499,8 +1537,9 @@ export const deleteServiceCategory = async (id: string): Promise<void> => {
   });
 
   if (linkedServicesCount > 0) {
-    throw new Error(
-      `Cannot delete category: ${linkedServicesCount} service(s) are linked to this category. Please update or remove those services first.`
+    throw new AppError(
+      `Cannot delete category: ${linkedServicesCount} service(s) are linked to this category. Please update or remove those services first.`,
+      400
     );
   }
 

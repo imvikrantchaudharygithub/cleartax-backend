@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { User } from '../models/User.model';
 import { RegisterRequest, LoginRequest, AuthResponse, JWTPayload } from '../types/auth.types';
 import { JWT_CONFIG } from '../config/constants';
+import { AppError } from '../middlewares/error.middleware';
 
 export const registerUser = async (data: RegisterRequest): Promise<AuthResponse> => {
   // Check if user already exists
@@ -12,9 +13,9 @@ export const registerUser = async (data: RegisterRequest): Promise<AuthResponse>
 
   if (existingUser) {
     if (existingUser.email === data.email) {
-      throw new Error('Email already registered');
+      throw new AppError('Email already registered', 409);
     }
-    throw new Error('Phone number already registered');
+    throw new AppError('Phone number already registered', 409);
   }
 
   // Hash password
@@ -55,19 +56,19 @@ export const loginUser = async (data: LoginRequest): Promise<AuthResponse> => {
   const user = await User.findOne({ email: data.email }).select('+password');
 
   if (!user) {
-    throw new Error('Invalid email or password');
+    throw new AppError('Invalid email or password', 401);
   }
 
   // Check if user is active
   if (!user.isActive) {
-    throw new Error('Account is inactive. Please contact support.');
+    throw new AppError('Account is inactive. Please contact support.', 403);
   }
 
   // Verify password
   const isPasswordValid = await bcrypt.compare(data.password, user.password);
 
   if (!isPasswordValid) {
-    throw new Error('Invalid email or password');
+    throw new AppError('Invalid email or password', 401);
   }
 
   // Generate tokens
@@ -101,7 +102,7 @@ export const refreshAccessToken = async (refreshToken: string): Promise<{ access
     const user = await User.findById(decoded.userId);
 
     if (!user || !user.isActive) {
-      throw new Error('User not found or inactive');
+      throw new AppError('User not found or inactive', 401);
     }
 
     // Generate new access token
@@ -122,7 +123,7 @@ export const refreshAccessToken = async (refreshToken: string): Promise<{ access
     return { accessToken };
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
-      throw new Error('Invalid refresh token');
+      throw new AppError('Invalid refresh token', 401);
     }
     throw error;
   }
@@ -132,7 +133,7 @@ export const getCurrentUser = async (userId: string) => {
   const user = await User.findById(userId).select('-password');
 
   if (!user) {
-    throw new Error('User not found');
+    throw new AppError('User not found', 404);
   }
 
   return {

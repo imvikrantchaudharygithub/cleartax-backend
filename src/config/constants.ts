@@ -72,6 +72,6 @@ export const CLOUDINARY_FOLDERS = {
 // Rate limiting
 export const RATE_LIMIT = {
   WINDOW_MS: 15 * 60 * 1000, // 15 minutes
-  MAX_REQUESTS: 100000, // 100000 requests per window (increased for data migration)
+  MAX_REQUESTS: 300, // 300 requests per 15-minute window
 } as const;
 

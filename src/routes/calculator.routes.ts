@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as calculatorController from '../controllers/calculator.controller';
 import { validate } from '../middlewares/validation.middleware';
+import { authenticate } from '../middlewares/auth.middleware';
 import {
   incomeTaxSchema,
   gstSchema,
@@ -18,9 +19,8 @@ router.post('/emi', validate(emiSchema), calculatorController.calculateEMI);
 router.post('/hra', validate(hraSchema), calculatorController.calculateHRA);
 router.post('/tds', validate(tdsSchema), calculatorController.calculateTDS);
 
-// History endpoint (requires authentication) - AUTH TEMPORARILY DISABLED
-// router.get('/history', authenticate, calculatorController.getCalculationHistory);
-router.get('/history', calculatorController.getCalculationHistory);
+// History endpoint (requires authentication)
+router.get('/history', authenticate, calculatorController.getCalculationHistory);
 
 export default router;
 

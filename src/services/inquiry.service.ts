@@ -8,6 +8,7 @@ import {
 import { PAGINATION } from '../config/constants';
 import { sendInquiryNotification } from './email.service';
 import mongoose from 'mongoose';
+import { AppError } from '../middlewares/error.middleware';
 
 export const createInquiry = async (data: InquiryCreateRequest): Promise<InquiryResponse> => {
   const inquiryData: any = {
@@ -93,7 +94,7 @@ export const getInquiryById = async (id: string): Promise<InquiryResponse> => {
   const inquiry = await Inquiry.findById(id).populate('serviceId', 'title slug').lean();
 
   if (!inquiry) {
-    throw new Error('Inquiry not found');
+    throw new AppError('Inquiry not found', 404);
   }
 
   return inquiry as unknown as InquiryResponse;
@@ -106,7 +107,7 @@ export const updateInquiryStatus = async (
   const inquiry = await Inquiry.findByIdAndUpdate(id, { status }, { new: true }).lean();
 
   if (!inquiry) {
-    throw new Error('Inquiry not found');
+    throw new AppError('Inquiry not found', 404);
   }
 
   return inquiry as unknown as InquiryResponse;
@@ -116,7 +117,7 @@ export const deleteInquiry = async (id: string): Promise<void> => {
   const inquiry = await Inquiry.findByIdAndDelete(id);
 
   if (!inquiry) {
-    throw new Error('Inquiry not found');
+    throw new AppError('Inquiry not found', 404);
   }
 };
 

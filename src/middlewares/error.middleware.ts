@@ -1,7 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import { AppError } from '../utils/AppError';
 
-export interface AppError extends Error {
+// Re-export AppError so existing imports from this module keep working.
+export { AppError };
+
+// Shape of errors that may reach the middleware (Express errors, Mongoose, JWT, etc.)
+interface ErrorLike extends Error {
   statusCode?: number;
   code?: number;
   keyValue?: Record<string, any>;
@@ -9,7 +14,7 @@ export interface AppError extends Error {
 }
 
 export const errorMiddleware = (
-  err: AppError,
+  err: ErrorLike,
   _req: Request,
   res: Response,
   _next: NextFunction
@@ -68,20 +73,19 @@ export const errorMiddleware = (
     message = 'Token expired';
   }
 
-  // Log error in development
-  if (process.env.NODE_ENV === 'development') {
-    console.error('Error:', {
-      message: err.message,
-      stack: err.stack,
-      statusCode,
-    });
-  }
+  // Always log the full error (including stack) server-side for debugging.
+  // Never send the stack in the HTTP response body: the server runs with
+  // NODE_ENV=development while connected to the production DB, so leaking a
+  // stack trace to clients would expose internals regardless of env.
+  console.error('Error:', {
+    message: err.message,
+    stack: err.stack,
+    statusCode,
+  });
 
   res.status(statusCode).json({
     success: false,
     message,
     ...(errors && { errors }),
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
-

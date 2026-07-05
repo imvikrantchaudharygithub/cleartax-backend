@@ -12,6 +12,7 @@ import {
 } from '../types/compliance.types';
 import { PAGINATION } from '../config/constants';
 import mongoose from 'mongoose';
+import { AppError } from '../middlewares/error.middleware';
 
 export const createComplianceDeadline = async (
   data: ComplianceDeadlineCreateRequest
@@ -89,7 +90,7 @@ export const updateComplianceDeadline = async (
   const deadline = await ComplianceDeadline.findByIdAndUpdate(id, data, { new: true }).lean();
 
   if (!deadline) {
-    throw new Error('Compliance deadline not found');
+    throw new AppError('Compliance deadline not found', 404);
   }
 
   return deadline as unknown as ComplianceDeadlineResponse;
@@ -99,7 +100,7 @@ export const deleteComplianceDeadline = async (id: string): Promise<void> => {
   const deadline = await ComplianceDeadline.findByIdAndDelete(id);
 
   if (!deadline) {
-    throw new Error('Compliance deadline not found');
+    throw new AppError('Compliance deadline not found', 404);
   }
 };
 
@@ -160,7 +161,7 @@ export const updateComplianceDocument = async (
   const document = await ComplianceDocument.findByIdAndUpdate(id, data, { new: true }).lean();
 
   if (!document) {
-    throw new Error('Compliance document not found');
+    throw new AppError('Compliance document not found', 404);
   }
 
   return document as unknown as ComplianceDocumentResponse;
@@ -170,7 +171,7 @@ export const deleteComplianceDocument = async (id: string): Promise<void> => {
   const document = await ComplianceDocument.findByIdAndDelete(id);
 
   if (!document) {
-    throw new Error('Compliance document not found');
+    throw new AppError('Compliance document not found', 404);
   }
 };
 

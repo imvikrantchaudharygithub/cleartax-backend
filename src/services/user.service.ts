@@ -17,13 +17,12 @@ export const createUser = async (data: UserCreateRequest): Promise<UserResponse>
   });
 
   if (existing) {
-    const conflict: AppError = new Error(
+    throw new AppError(
       existing.email === data.email.toLowerCase()
         ? 'Email already registered'
-        : 'Phone number already registered'
+        : 'Phone number already registered',
+      409
     );
-    conflict.statusCode = 409;
-    throw conflict;
   }
 
   const hashedPassword = await bcrypt.hash(data.password, 10);
@@ -85,7 +84,7 @@ export const getUserById = async (id: string): Promise<UserResponse> => {
   const user = await User.findById(id).select('-password').lean();
 
   if (!user) {
-    throw new Error('User not found');
+    throw new AppError('User not found', 404);
   }
 
   return user as unknown as UserResponse;
@@ -95,7 +94,7 @@ export const updateUser = async (id: string, data: UserUpdateRequest): Promise<U
   const user = await User.findByIdAndUpdate(id, data, { new: true }).select('-password').lean();
 
   if (!user) {
-    throw new Error('User not found');
+    throw new AppError('User not found', 404);
   }
 
   return user as unknown as UserResponse;
@@ -107,7 +106,7 @@ export const updateUserRole = async (id: string, data: UserRoleUpdateRequest): P
     .lean();
 
   if (!user) {
-    throw new Error('User not found');
+    throw new AppError('User not found', 404);
   }
 
   return user as unknown as UserResponse;
@@ -117,7 +116,7 @@ export const deleteUser = async (id: string): Promise<void> => {
   const user = await User.findByIdAndDelete(id);
 
   if (!user) {
-    throw new Error('User not found');
+    throw new AppError('User not found', 404);
   }
 };
 

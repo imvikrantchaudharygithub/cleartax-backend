@@ -1,6 +1,7 @@
 import { Blog } from '../models/Blog.model';
 import { BlogCreateRequest, BlogUpdateRequest, BlogQueryParams, BlogResponse } from '../types/blog.types';
 import { PAGINATION } from '../config/constants';
+import { AppError } from '../middlewares/error.middleware';
 
 const generateSlug = (title: string): string => {
   return title
@@ -17,7 +18,7 @@ export const createBlog = async (data: BlogCreateRequest): Promise<BlogResponse>
   // Check if slug already exists
   const existingBlog = await Blog.findOne({ slug });
   if (existingBlog) {
-    throw new Error('A blog with this title already exists');
+    throw new AppError('A blog with this title already exists', 409);
   }
 
   const blog = await Blog.create({
@@ -78,7 +79,7 @@ export const getBlogBySlug = async (slug: string): Promise<BlogResponse> => {
   const blog = await Blog.findOne({ slug }).lean();
 
   if (!blog) {
-    throw new Error('Blog not found');
+    throw new AppError('Blog not found', 404);
   }
 
   return blog as unknown as BlogResponse;
@@ -101,7 +102,7 @@ export const getRelatedBlogs = async (slug: string, limit: number = 3): Promise<
   const currentBlog = await Blog.findOne({ slug });
 
   if (!currentBlog) {
-    throw new Error('Blog not found');
+    throw new AppError('Blog not found', 404);
   }
 
   const blogs = await Blog.find({
@@ -119,17 +120,22 @@ export const updateBlog = async (id: string, data: BlogUpdateRequest): Promise<B
   const blog = await Blog.findById(id);
 
   if (!blog) {
-    throw new Error('Blog not found');
+    throw new AppError('Blog not found', 404);
   }
 
-  // Generate new slug if title changed
-  if (data.title && data.title !== blog.title) {
-    const newSlug = generateSlug(data.title);
+  // Slug is a stable, shareable URL key: once a blog is created its slug must not
+  // change, even when the title is edited (changing it would break existing links
+  // and SEO). Only honour an explicitly-provided slug, and keep it unique.
+  if (data.slug && data.slug !== blog.slug) {
+    const newSlug = generateSlug(data.slug);
     const existingBlog = await Blog.findOne({ slug: newSlug, _id: { $ne: id } });
     if (existingBlog) {
-      throw new Error('A blog with this title already exists');
+      throw new AppError('A blog with this slug already exists', 409);
     }
     data.slug = newSlug;
+  } else {
+    // Never let a title change regenerate the slug.
+    delete (data as any).slug;
   }
 
   if (data.date && typeof data.date === 'string') {
@@ -146,7 +152,7 @@ export const deleteBlog = async (id: string): Promise<void> => {
   const blog = await Blog.findByIdAndDelete(id);
 
   if (!blog) {
-    throw new Error('Blog not found');
+    throw new AppError('Blog not found', 404);
   }
 };
 

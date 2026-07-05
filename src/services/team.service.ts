@@ -5,6 +5,7 @@ import {
   TeamMemberUpdateRequest,
   TeamMemberResponse,
 } from '../types/team.types';
+import { AppError } from '../middlewares/error.middleware';
 
 const isMongoId = (s: string) => /^[a-fA-F0-9]{24}$/.test(s);
 
@@ -17,7 +18,7 @@ export const getTeamMemberById = async (id: string): Promise<TeamMemberResponse>
   const member = await Team.findOne({ id }).lean();
 
   if (!member) {
-    throw new Error('Team member not found');
+    throw new AppError('Team member not found', 404);
   }
 
   return member as unknown as TeamMemberResponse;
@@ -28,7 +29,7 @@ export const createTeamMember = async (data: TeamMemberCreateRequest): Promise<T
   const existing = await Team.findOne({ id: data.id });
 
   if (existing) {
-    throw new Error('A team member with this ID already exists');
+    throw new AppError('A team member with this ID already exists', 409);
   }
 
   const member = await Team.create(data);
@@ -45,7 +46,7 @@ export const updateTeamMember = async (
   const member = await Team.findOneAndUpdate(filter, data, { new: true }).lean();
 
   if (!member) {
-    throw new Error('Team member not found');
+    throw new AppError('Team member not found', 404);
   }
 
   return member as unknown as TeamMemberResponse;
@@ -79,7 +80,7 @@ export const deleteTeamMember = async (id: string): Promise<void> => {
     : { id };
   const member = await Team.findOneAndDelete(filter);
   if (!member) {
-    throw new Error('Team member not found');
+    throw new AppError('Team member not found', 404);
   }
 };
 

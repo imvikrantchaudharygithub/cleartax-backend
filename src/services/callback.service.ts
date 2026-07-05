@@ -8,6 +8,7 @@ import {
 } from '../types/callback.types';
 import { PAGINATION } from '../config/constants';
 import mongoose from 'mongoose';
+import { AppError } from '../middlewares/error.middleware';
 
 /**
  * Parse category and subcategory from sourcePage URL
@@ -201,7 +202,7 @@ export const getCallbackById = async (id: string): Promise<CallbackResponse> => 
   }
   
   if (!callback) {
-    throw new Error('Callback request not found');
+    throw new AppError('Callback request not found', 404);
   }
   
   return {
@@ -230,7 +231,7 @@ export const updateCallback = async (id: string, data: CallbackUpdateRequest): P
   }
   
   if (!callback) {
-    throw new Error('Callback request not found');
+    throw new AppError('Callback request not found', 404);
   }
   
   // Update fields
@@ -274,7 +275,7 @@ export const deleteCallback = async (id: string): Promise<void> => {
   }
   
   if (!callback) {
-    throw new Error('Callback request not found');
+    throw new AppError('Callback request not found', 404);
   }
 };
 
