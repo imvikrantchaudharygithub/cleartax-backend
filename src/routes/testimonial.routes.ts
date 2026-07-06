@@ -7,13 +7,14 @@ import {
 } from '../validations/testimonial.validations';
 import { testimonialImageUpload } from '../middlewares/upload.middleware';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
+import { publicCache } from '../middlewares/cache.middleware';
 
 const router = Router();
 
-// Public routes
-router.get('/', testimonialController.getTestimonials);
-router.get('/featured', testimonialController.getFeaturedTestimonials);
-router.get('/:id', testimonialController.getTestimonialById);
+// Public routes (edge-cached)
+router.get('/', publicCache, testimonialController.getTestimonials);
+router.get('/featured', publicCache, testimonialController.getFeaturedTestimonials);
+router.get('/:id', publicCache, testimonialController.getTestimonialById);
 
 // Protected routes — admin only
 router.post('/', authenticate, authorize('admin'), testimonialImageUpload, validate(createTestimonialSchema), testimonialController.createTestimonial);

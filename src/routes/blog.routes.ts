@@ -9,15 +9,16 @@ import {
 } from '../validations/blog.validations';
 import { singleImageUpload } from '../middlewares/upload.middleware';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
+import { publicCache } from '../middlewares/cache.middleware';
 
 const router = Router();
 
-// Public routes
-router.get('/', validate(blogQuerySchema), blogController.getBlogs);
-router.get('/featured', blogController.getFeaturedBlog);
-router.get('/recent', blogController.getRecentBlogs);
-router.get('/:slug', validate(getBlogBySlugSchema), blogController.getBlogBySlug);
-router.get('/:slug/related', validate(getBlogBySlugSchema), blogController.getRelatedBlogs);
+// Public routes (edge-cached)
+router.get('/', publicCache, validate(blogQuerySchema), blogController.getBlogs);
+router.get('/featured', publicCache, blogController.getFeaturedBlog);
+router.get('/recent', publicCache, blogController.getRecentBlogs);
+router.get('/:slug', publicCache, validate(getBlogBySlugSchema), blogController.getBlogBySlug);
+router.get('/:slug/related', publicCache, validate(getBlogBySlugSchema), blogController.getRelatedBlogs);
 
 // Protected routes — admin only
 router.post('/', authenticate, authorize('admin'), singleImageUpload, validate(createBlogSchema), blogController.createBlog);

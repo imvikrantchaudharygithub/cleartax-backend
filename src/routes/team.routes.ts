@@ -8,12 +8,13 @@ import {
 } from '../validations/team.validations';
 import { singleFileUpload } from '../middlewares/upload.middleware';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
+import { publicCache } from '../middlewares/cache.middleware';
 
 const router = Router();
 
-// Public routes
-router.get('/', teamController.getTeamMembers);
-router.get('/:id', teamController.getTeamMemberById);
+// Public routes (edge-cached)
+router.get('/', publicCache, teamController.getTeamMembers);
+router.get('/:id', publicCache, teamController.getTeamMemberById);
 
 // Protected routes — admin only
 // NOTE: /reorder must be declared before /:id so it isn't captured as an id param.

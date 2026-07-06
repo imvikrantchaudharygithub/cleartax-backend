@@ -15,19 +15,20 @@ import {
   publishServiceDraftSchema,
 } from '../validations/service.validations';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
+import { publicCache } from '../middlewares/cache.middleware';
 
 const router = Router();
 
-// Public GET routes
-router.get('/', validate(serviceQuerySchema), serviceController.getServices);
-router.get('/categories', serviceController.getServiceCategories);
-router.get('/categories/:id', serviceController.getServiceCategoryById);
+// Public GET routes (edge-cached; drafts stay uncached)
+router.get('/', publicCache, validate(serviceQuerySchema), serviceController.getServices);
+router.get('/categories', publicCache, serviceController.getServiceCategories);
+router.get('/categories/:id', publicCache, serviceController.getServiceCategoryById);
 router.get('/draft/:id', serviceController.getServiceDraftById);
 router.get('/drafts', serviceController.getServiceDrafts);
-router.get('/:category', serviceController.getServicesByCategory);
-router.get('/:category/:subcategory', serviceController.getServicesBySubcategory);
-router.get('/:category/:subcategory/:slug', serviceController.getServiceBySubcategorySlug);
-router.get('/:category/:slug', serviceController.getServiceBySlug);
+router.get('/:category', publicCache, serviceController.getServicesByCategory);
+router.get('/:category/:subcategory', publicCache, serviceController.getServicesBySubcategory);
+router.get('/:category/:subcategory/:slug', publicCache, serviceController.getServiceBySubcategorySlug);
+router.get('/:category/:slug', publicCache, serviceController.getServiceBySlug);
 
 // Protected routes — admin only
 // Draft management
