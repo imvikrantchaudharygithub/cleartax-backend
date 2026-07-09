@@ -13,11 +13,6 @@ export const getHomeInfoPublic = async () => {
 export const updateHomeInfo = async (data: any, files: Express.Multer.File[]) => {
   let homeInfo = await HomeInfo.findOne();
 
-  // Ensure banner.heroImages array exists when processing hero image uploads
-  if (data.banner && !Array.isArray(data.banner.heroImages)) {
-    data.banner.heroImages = [];
-  }
-
   // Handle file uploads
   if (files && files.length > 0) {
     for (const file of files) {
@@ -79,6 +74,14 @@ export const updateHomeInfo = async (data: any, files: Express.Multer.File[]) =>
         }
       }
     }
+  }
+
+  // Drop hero image slots that never got a URL (added in the form but no file
+  // uploaded and no existing URL) so they don't render as blank slides.
+  if (data.banner && Array.isArray(data.banner.heroImages)) {
+    data.banner.heroImages = data.banner.heroImages.filter(
+      (img: any) => img && typeof img.url === 'string' && img.url.trim() !== ''
+    );
   }
 
   if (!homeInfo) {
