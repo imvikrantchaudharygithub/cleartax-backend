@@ -13,6 +13,7 @@ import {
   createServiceDraftSchema,
   updateServiceDraftSchema,
   publishServiceDraftSchema,
+  generateServiceSchema,
 } from '../validations/service.validations';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { publicCache } from '../middlewares/cache.middleware';
@@ -37,6 +38,9 @@ router.put('/draft/:id', authenticate, authorize('admin'), validate(updateServic
 router.delete('/draft/:id', authenticate, authorize('admin'), serviceController.deleteServiceDraft);
 router.post('/publish/:id', authenticate, authorize('admin'), validate(publishServiceDraftSchema), serviceController.publishServiceDraft);
 router.post('/unpublish/:id', authenticate, authorize('admin'), serviceController.unpublishService);
+
+// AI generation
+router.post('/generate', authenticate, authorize('admin'), validate(generateServiceSchema), serviceController.generateServiceDetails);
 
 // Category CRUD — must come before generic /:category routes
 router.post('/categories', authenticate, authorize('admin'), validate(createServiceCategorySchema), serviceController.createServiceCategory);

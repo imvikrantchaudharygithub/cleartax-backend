@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as serviceService from '../services/service.service';
+import * as aiGenerateService from '../services/aiGenerate.service';
 import { Service } from '../models/Service.model';
 import { ServiceCategory } from '../models/ServiceCategory.model';
 import mongoose from 'mongoose';
@@ -2387,10 +2388,23 @@ export const deleteServiceBySubcategory = async (
 
     // Delete the service
     await serviceService.deleteService(service._id.toString());
-    
+
     res.status(200).json({
       success: true,
       message: 'Service deleted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const generateServiceDetails = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const details = await aiGenerateService.generateServiceDetails(req.body);
+    res.status(200).json({
+      success: true,
+      data: details,
+      message: 'Service details generated successfully',
     });
   } catch (error) {
     next(error);
