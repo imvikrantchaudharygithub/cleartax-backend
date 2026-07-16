@@ -17,6 +17,8 @@ const envSchema = z.object({
   EMAIL_USER: z.string().optional(),
   EMAIL_PASS: z.string().optional(),
   EMAIL_FROM: z.string().email().optional(),
+  NVIDIA_NIM_API_KEY: z.string().optional(),
+  NIM_MODEL: z.string().optional(),
 });
 
 export const validateEnv = (): void => {
