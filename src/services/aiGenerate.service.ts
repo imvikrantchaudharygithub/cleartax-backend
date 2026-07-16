@@ -5,6 +5,7 @@ const NIM_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
 // llama-3.3-70b queue-times-out on NIM; nemotron-49b measured ~43s with high quality.
 const DEFAULT_MODEL = 'nvidia/llama-3.3-nemotron-super-49b-v1.5';
 const TIMEOUT_MS = 120_000;
+const TOTAL_BUDGET_MS = 140_000;
 
 // Keep in sync with commonIcons in frontend ServiceFormStep1.tsx
 const ALLOWED_ICONS = [
@@ -48,8 +49,8 @@ const rawResponseSchema = z.object({
   longDescription: z.string().min(50),
   iconName: z.string().min(1),
   price: z.object({
-    min: z.number().min(0),
-    max: z.number().min(0),
+    min: z.number().min(0).max(10_000_000),
+    max: z.number().min(0).max(10_000_000),
     currency: z.string().default('INR'),
   }),
   duration: z.string().min(1),
@@ -111,7 +112,8 @@ const extractJson = (text: string): unknown => {
 };
 
 const callNim = async (
-  messages: { role: string; content: string }[]
+  messages: { role: string; content: string }[],
+  timeoutMs: number
 ): Promise<string> => {
   const apiKey = process.env.NVIDIA_NIM_API_KEY;
   if (!apiKey) {
@@ -119,7 +121,7 @@ const callNim = async (
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(NIM_URL, {
       method: 'POST',
@@ -197,8 +199,14 @@ export const generateServiceDetails = async (
     { role: 'user', content: buildUserPrompt(input) },
   ];
 
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
+
   // Attempt 1, then one retry with a stronger JSON reminder.
   for (let attempt = 1; attempt <= 2; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 5_000) {
+      throw new AppError('AI generation timed out — please try again', 502);
+    }
     const content = await callNim(
       attempt === 1
         ? messages
@@ -209,7 +217,8 @@ export const generateServiceDetails = async (
               content:
                 'Your previous output was not valid JSON matching the schema. Return ONLY the JSON object, nothing else.',
             },
-          ]
+          ],
+      Math.min(TIMEOUT_MS, remaining)
     );
     try {
       const parsed = rawResponseSchema.parse(extractJson(content));

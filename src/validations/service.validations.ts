@@ -196,8 +196,8 @@ export const publishServiceDraftSchema = z.object({
 export const generateServiceSchema = z.object({
   body: z.object({
     title: z.string().min(3, 'Title must be at least 3 characters').max(200, 'Title too long'),
-    category: z.string().optional(),
-    subcategory: z.string().optional(),
+    category: z.string().max(100, 'Category too long').optional(),
+    subcategory: z.string().max(100, 'Subcategory too long').optional(),
   }),
 });
 
